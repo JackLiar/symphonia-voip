@@ -1,0 +1,17 @@
+[package]
+name = "symphonia-bundle-evs"
+version = "0.5.3"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+num-derive = "0.4"
+num-traits = "0.2"
+symphonia-core = "0.5.3"
+
+[dependencies.evs-codec-sys]
+path = "../evs-codec-sys"
+
+[features]
+default = ["floating-point"]
+floating-point = ["evs-codec-sys/floating-point"]
