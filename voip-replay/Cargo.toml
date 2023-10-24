@@ -20,6 +20,6 @@ libpulse-simple-binding = "2.5.0"
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 arrayvec = "0.7.1"
-cpal = "0.13.3"
+cpal = "0.15.2"
 rb = "0.3.2"
 rubato = "0.12.0"

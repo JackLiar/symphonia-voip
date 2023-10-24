@@ -183,13 +183,23 @@ mod cpal {
     pub struct CpalAudioOutput;
 
     trait AudioOutputSample:
-        cpal::Sample + ConvertibleSample + IntoSample<f32> + RawSample + std::marker::Send + 'static
+        cpal::SizedSample
+        + ConvertibleSample
+        + IntoSample<f32>
+        + RawSample
+        + std::marker::Send
+        + 'static
     {
     }
 
-    impl AudioOutputSample for f32 {}
+    impl AudioOutputSample for i8 {}
+    impl AudioOutputSample for u8 {}
     impl AudioOutputSample for i16 {}
     impl AudioOutputSample for u16 {}
+    impl AudioOutputSample for i32 {}
+    impl AudioOutputSample for u32 {}
+    impl AudioOutputSample for f32 {}
+    impl AudioOutputSample for f64 {}
 
     impl CpalAudioOutput {
         pub fn try_open(spec: SignalSpec, duration: Duration) -> Result<Box<dyn AudioOutput>> {
@@ -215,8 +225,11 @@ mod cpal {
 
             // Select proper playback routine based on sample format.
             match config.sample_format() {
-                cpal::SampleFormat::F32 => {
-                    CpalAudioOutputImpl::<f32>::try_open(spec, duration, &device)
+                cpal::SampleFormat::I8 => {
+                    CpalAudioOutputImpl::<i8>::try_open(spec, duration, &device)
+                }
+                cpal::SampleFormat::U8 => {
+                    CpalAudioOutputImpl::<u8>::try_open(spec, duration, &device)
                 }
                 cpal::SampleFormat::I16 => {
                     CpalAudioOutputImpl::<i16>::try_open(spec, duration, &device)
@@ -224,6 +237,19 @@ mod cpal {
                 cpal::SampleFormat::U16 => {
                     CpalAudioOutputImpl::<u16>::try_open(spec, duration, &device)
                 }
+                cpal::SampleFormat::I32 => {
+                    CpalAudioOutputImpl::<i32>::try_open(spec, duration, &device)
+                }
+                cpal::SampleFormat::U32 => {
+                    CpalAudioOutputImpl::<u32>::try_open(spec, duration, &device)
+                }
+                cpal::SampleFormat::F32 => {
+                    CpalAudioOutputImpl::<f32>::try_open(spec, duration, &device)
+                }
+                cpal::SampleFormat::F64 => {
+                    CpalAudioOutputImpl::<f64>::try_open(spec, duration, &device)
+                }
+                _ => unimplemented!(),
             }
         }
     }
@@ -278,6 +304,7 @@ mod cpal {
                     data[written..].iter_mut().for_each(|s| *s = T::MID);
                 },
                 move |err| error!("audio output error: {}", err),
+                None,
             );
 
             if let Err(err) = stream_result {
