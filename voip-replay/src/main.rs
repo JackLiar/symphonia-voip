@@ -25,7 +25,7 @@ use symphonia::core::meta::{ColorMode, MetadataOptions, MetadataRevision, Tag, V
 use symphonia::core::probe::{Hint, Probe, ProbeResult};
 use symphonia::core::units::{Time, TimeBase};
 
-use clap::{Arg, ArgMatches};
+use clap::{Arg, ArgAction, ArgMatches};
 use log::{error, info, warn};
 use symphonia::default::{register_enabled_codecs, register_enabled_formats};
 
@@ -59,35 +59,41 @@ fn main() {
         .arg(
             Arg::new("decode-only")
                 .long("decode-only")
+                .action(ArgAction::SetTrue)
                 .help("Decode, but do not play the audio")
                 .conflicts_with_all(&["probe-only", "verify-only", "verify"]),
         )
         .arg(
             Arg::new("probe-only")
                 .long("probe-only")
+                .action(ArgAction::SetTrue)
                 .help("Only probe the input for metadata")
                 .conflicts_with_all(&["decode-only", "verify-only"]),
         )
         .arg(
             Arg::new("verify-only")
                 .long("verify-only")
+                .action(ArgAction::SetTrue)
                 .help("Verify the decoded audio is valid, but do not play the audio")
                 .conflicts_with_all(&["verify"]),
         )
         .arg(
             Arg::new("verify")
                 .long("verify")
+                .action(ArgAction::SetTrue)
                 .short('v')
                 .help("Verify the decoded audio is valid during playback"),
         )
         .arg(
             Arg::new("no-progress")
                 .long("no-progress")
+                .action(ArgAction::SetTrue)
                 .help("Do not display playback progress"),
         )
         .arg(
             Arg::new("no-gapless")
                 .long("no-gapless")
+                .action(ArgAction::SetTrue)
                 .help("Disable gapless decoding and playback"),
         )
         .arg(
@@ -119,7 +125,7 @@ fn main() {
 }
 
 fn run(args: &ArgMatches, registry: CodecRegistry, probe: Probe) -> Result<i32> {
-    let path_str = args.value_of("INPUT").unwrap();
+    let path_str: &String = args.get_one("INPUT").unwrap();
 
     // Create a hint to help the format registry guess what format reader is appropriate.
     let mut hint = Hint::new();
@@ -146,7 +152,7 @@ fn run(args: &ArgMatches, registry: CodecRegistry, probe: Probe) -> Result<i32> 
 
     // Use the default options for format readers other than for gapless playback.
     let format_opts = FormatOptions {
-        enable_gapless: !args.is_present("no-gapless"),
+        enable_gapless: !args.get_flag("no-gapless"),
         ..Default::default()
     };
 
@@ -154,17 +160,17 @@ fn run(args: &ArgMatches, registry: CodecRegistry, probe: Probe) -> Result<i32> 
     let metadata_opts: MetadataOptions = Default::default();
 
     // Get the value of the track option, if provided.
-    let track = match args.value_of("track") {
+    let track = match args.get_one::<&str>("track") {
         Some(track_str) => track_str.parse::<usize>().ok(),
         _ => None,
     };
 
-    let no_progress = args.is_present("no-progress");
+    let no_progress = args.get_flag("no-progress");
 
     // Probe the media source stream for metadata and get the format reader.
     match probe.format(&hint, mss, &format_opts, &metadata_opts) {
         Ok(mut probed) => {
-            if args.is_present("verify-only") {
+            if args.get_flag("verify-only") {
                 // Verify-only mode decodes and verifies the audio, but does not play it.
                 decode_only(
                     &registry,
@@ -174,7 +180,7 @@ fn run(args: &ArgMatches, registry: CodecRegistry, probe: Probe) -> Result<i32> 
                         ..Default::default()
                     },
                 )
-            } else if args.is_present("decode-only") {
+            } else if args.get_flag("decode-only") {
                 // Decode-only mode decodes the audio, but does not play or verify it.
                 decode_only(
                     &registry,
@@ -184,7 +190,7 @@ fn run(args: &ArgMatches, registry: CodecRegistry, probe: Probe) -> Result<i32> 
                         ..Default::default()
                     },
                 )
-            } else if args.is_present("probe-only") {
+            } else if args.get_flag("probe-only") {
                 // Probe-only mode only prints information about the format, tracks, metadata, etc.
                 print_format(&registry, path_str, &mut probed);
                 Ok(0)
@@ -194,12 +200,12 @@ fn run(args: &ArgMatches, registry: CodecRegistry, probe: Probe) -> Result<i32> 
 
                 // If present, parse the seek argument.
                 let seek_time = args
-                    .value_of("seek")
-                    .map(|p| p.parse::<f64>().unwrap_or(0.0));
+                    .get_one("seek")
+                    .map(|p: &String| p.parse::<f64>().unwrap_or(0.0));
 
                 // Set the decoder options.
                 let decode_opts = DecoderOptions {
-                    verify: args.is_present("verify"),
+                    verify: args.get_flag("verify"),
                     ..Default::default()
                 };
 
