@@ -4,14 +4,12 @@ version = "0.1.0"
 edition = "2021"
 links = "evs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 
 [build-dependencies]
 anyhow = "1"
-bindgen = { version = "0.66", optional = true }
-cc = { version = "1.0", features = ["parallel"] }
+bindgen = { workspace = true, optional = true }
+cc = { workspace = true }
 
 [features]
 default = ["floating-point", "gen"]
