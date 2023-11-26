@@ -1,0 +1,13 @@
+[package]
+name = "opencore-amr-sys"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[build-dependencies]
+anyhow = "1"
+bindgen = { version = "0.69", optional = true }
+
+[features]
+gen = ["bindgen"]
