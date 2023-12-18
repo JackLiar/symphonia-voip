@@ -8,6 +8,7 @@ edition = "2021"
 [build-dependencies]
 anyhow = "1"
 bindgen = { version = "0.69", optional = true }
+cargo-emit = "0.2"
 
 [features]
 gen = ["bindgen"]

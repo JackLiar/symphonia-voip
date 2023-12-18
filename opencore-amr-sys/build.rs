@@ -24,5 +24,9 @@ fn main() -> Result<()> {
             .write_to_file(&out_path)
             .unwrap_or_else(|e| panic!("Could not write to {:?}, {}", out_path, e));
     }
+
+    cargo_emit::rustc_link_lib!("opencore-amrnb");
+    cargo_emit::rustc_link_lib!("opencore-amrwb");
+
     Ok(())
 }
