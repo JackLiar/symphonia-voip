@@ -13,7 +13,6 @@ use symphonia_core::probe::{Descriptor, Instantiate, QueryDescriptor};
 use symphonia_core::support_format;
 use symphonia_core::units::TimeBase;
 
-use crate::consts::CodecFormat;
 use crate::dec::DecoderParams;
 use crate::EvsToc;
 
@@ -131,20 +130,20 @@ impl FormatReader for EvsReader {
     }
 
     fn next_packet(&mut self) -> Result<Packet> {
-        /// read toc byte
+        // read toc byte
         let mut data_len = 0;
         let toc = EvsToc(self.reader.read_byte()?);
         data_len += 1;
 
-        /// if is a valid frame, read speech data
+        // if is a valid frame, read speech data
         if let Some(len) = toc.payload_size() {
             data_len += len;
         }
 
-        /// rewind position, because codec needs toc to get quality/bitrate information
+        // rewind position, because codec needs toc to get quality/bitrate information
         self.reader.seek(SeekFrom::Current(-1))?;
 
-        /// read all data
+        // read all data
         let data = self.reader.read_boxed_slice_exact(data_len)?;
 
         let pkt = Packet::new_from_boxed_slice(

@@ -1,5 +1,3 @@
-use std::os::raw::c_uint;
-
 use num_derive::FromPrimitive;
 
 use evs_codec_sys::{
