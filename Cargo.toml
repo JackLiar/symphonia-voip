@@ -9,6 +9,7 @@ members = [
 ]
 
 [workspace.dependencies]
+anyhow = { version = "1" }
 bindgen = { version = "0.69" }
 cc = { version = "1.0", features = ["parallel"] }
 hex = "0.4"

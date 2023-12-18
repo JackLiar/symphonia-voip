@@ -7,7 +7,7 @@ links = "evs"
 [dependencies]
 
 [build-dependencies]
-anyhow = "1"
+anyhow = { workspace = true }
 bindgen = { workspace = true, optional = true }
 cc = { workspace = true }
 

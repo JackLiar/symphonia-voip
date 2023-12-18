@@ -6,8 +6,8 @@ edition = "2021"
 [dependencies]
 
 [build-dependencies]
-anyhow = "1"
-bindgen = { version = "0.69", optional = true }
+anyhow = { workspace = true }
+bindgen = { workspace = true, optional = true }
 cargo-emit = "0.2"
 
 [features]
