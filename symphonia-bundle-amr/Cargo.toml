@@ -1,0 +1,9 @@
+[package]
+name = "symphonia-bundle-amr"
+version = "0.5.3"
+edition = "2021"
+
+[dependencies]
+symphonia-core = { workspace = true }
+
+opencore-amr-sys = { path = "../opencore-amr-sys" }

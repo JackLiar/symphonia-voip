@@ -107,10 +107,14 @@ fn main() {
     let mut registry = CodecRegistry::new();
     register_enabled_codecs(&mut registry);
     registry.register_all::<symphonia_bundle_evs::dec::Decoder>();
+    registry.register_all::<symphonia_bundle_amr::AmrDecoder>();
+    registry.register_all::<symphonia_bundle_amr::AmrwbDecoder>();
 
     let mut probe = Probe::default();
     register_enabled_formats(&mut probe);
     probe.register_all::<symphonia_bundle_evs::format::EvsReader>();
+    probe.register_all::<symphonia_bundle_amr::AmrReader>();
+    probe.register_all::<symphonia_bundle_amr::AmrwbReader>();
 
     // For any error, return an exit code -1. Otherwise return the exit code provided.
     let code = match run(&args, registry, probe) {
