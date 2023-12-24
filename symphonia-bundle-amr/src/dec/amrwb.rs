@@ -14,6 +14,8 @@ use symphonia_core::units::TimeBase;
 
 use opencore_amr_sys::{D_IF_decode, D_IF_exit, D_IF_init};
 
+use crate::{AMRWB_BUFFER_SIZE, AMRWB_SAMPLE_RATE};
+
 pub const CODEC_TYPE_AMRWB: CodecType = decl_codec_type(b"amrwb");
 
 /// A dummy Decoder struct to handle c_void casting
@@ -30,7 +32,10 @@ impl Decoder {
     pub fn new() -> Self {
         unsafe {
             Self {
-                decoded_data: AudioBuffer::new(320, SignalSpec::new(16000, Channels::all())),
+                decoded_data: AudioBuffer::new(
+                    AMRWB_BUFFER_SIZE,
+                    SignalSpec::new(AMRWB_SAMPLE_RATE, Channels::all()),
+                ),
                 params: CodecParameters::default(),
                 st: Box::from_raw(D_IF_init() as *mut _),
             }
@@ -68,8 +73,8 @@ impl D for Decoder {
         decoder.params.channels = Some(Channels::FRONT_CENTRE);
         decoder
             .params
-            .with_sample_rate(16000)
-            .with_time_base(TimeBase::new(1, 16000));
+            .with_sample_rate(AMRWB_SAMPLE_RATE)
+            .with_time_base(TimeBase::new(1, AMRWB_SAMPLE_RATE));
         Ok(decoder)
     }
 
@@ -91,7 +96,8 @@ impl D for Decoder {
 
     fn decode(&mut self, packet: &Packet) -> Result<AudioBufferRef> {
         self.decoded_data.clear();
-        self.decoded_data.render_reserved(Some(320));
+        self.decoded_data
+            .render_reserved(Some(AMRWB_BUFFER_SIZE as usize));
 
         self.decode(&packet.data);
 

@@ -12,6 +12,7 @@ use symphonia_core::support_format;
 use symphonia_core::units::TimeBase;
 
 use crate::dec::CODEC_TYPE_AMR;
+use crate::{AMR_BUFFER_SIZE, AMR_SAMPLE_RATE};
 
 const AMR_MIME_MAGIC: &[u8] = b"#!AMR\n";
 const AMR_MC_MIME_MAGIC: &[u8] = b"#!AMR_MC1.0\n";
@@ -99,10 +100,10 @@ impl FormatReader for AmrReader {
         for cid in 0..amr.channels {
             let mut codec_params = CodecParameters::new();
             codec_params.codec = CODEC_TYPE_AMR;
-            codec_params.with_sample_rate(8000);
+            codec_params.with_sample_rate(AMR_SAMPLE_RATE);
             codec_params
-                .with_sample_rate(8000)
-                .with_time_base(TimeBase::new(1, 8000));
+                .with_sample_rate(AMR_SAMPLE_RATE)
+                .with_time_base(TimeBase::new(1, AMR_SAMPLE_RATE));
 
             amr.consumed = consumed;
             amr.tracks.push(Track::new(cid as u32, codec_params));
@@ -128,8 +129,8 @@ impl FormatReader for AmrReader {
 
         let pkt = Packet::new_from_boxed_slice(
             self.chl_idx as u32,
-            self.track_ts[self.chl_idx] * 160,
-            160,
+            self.track_ts[self.chl_idx] * AMR_BUFFER_SIZE,
+            AMR_BUFFER_SIZE,
             data,
         );
         self.track_ts[self.chl_idx] += 1;

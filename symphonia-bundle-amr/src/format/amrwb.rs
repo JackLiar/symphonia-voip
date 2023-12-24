@@ -13,6 +13,7 @@ use symphonia_core::support_format;
 use symphonia_core::units::TimeBase;
 
 use crate::dec::CODEC_TYPE_AMRWB;
+use crate::{AMRWB_BUFFER_SIZE, AMRWB_SAMPLE_RATE};
 
 const AMRWB_MIME_MAGIC: &[u8] = b"#!AMR-WB\n";
 const AMRWB_MC_MIME_MAGIC: &[u8] = b"#!AMR-WB_MC1.0\n";
@@ -106,8 +107,8 @@ impl FormatReader for AmrwbReader {
             codec_params.codec = CODEC_TYPE_AMRWB;
             codec_params.channels = Some(Channels::FRONT_CENTRE);
             codec_params
-                .with_sample_rate(16000)
-                .with_time_base(TimeBase::new(1, 16000));
+                .with_sample_rate(AMRWB_SAMPLE_RATE)
+                .with_time_base(TimeBase::new(1, AMRWB_SAMPLE_RATE));
 
             amr.consumed = consumed;
             amr.tracks.push(Track::new(cid as u32, codec_params));
@@ -133,8 +134,8 @@ impl FormatReader for AmrwbReader {
 
         let pkt = Packet::new_from_boxed_slice(
             self.chl_idx as u32,
-            self.track_ts[self.chl_idx] * 320,
-            320,
+            self.track_ts[self.chl_idx] * AMRWB_BUFFER_SIZE,
+            AMRWB_BUFFER_SIZE,
             data,
         );
         self.track_ts[self.chl_idx] += 1;
