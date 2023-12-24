@@ -1,5 +1,6 @@
 use std::io::{Seek, SeekFrom};
 
+use symphonia_core::audio::Channels;
 use symphonia_core::codecs::CodecParameters;
 use symphonia_core::errors::{seek_error, Error, Result, SeekErrorKind};
 use symphonia_core::formats::{
@@ -86,7 +87,7 @@ impl QueryDescriptor for AmrReader {
 }
 
 impl FormatReader for AmrReader {
-    fn try_new(source: MediaSourceStream, options: &FormatOptions) -> Result<Self> {
+    fn try_new(source: MediaSourceStream, _options: &FormatOptions) -> Result<Self> {
         let mut amr = Self::new(source);
         let consumed = AMR_MIME_MAGIC.len();
 
@@ -100,7 +101,7 @@ impl FormatReader for AmrReader {
         for cid in 0..amr.channels {
             let mut codec_params = CodecParameters::new();
             codec_params.codec = CODEC_TYPE_AMR;
-            codec_params.with_sample_rate(AMR_SAMPLE_RATE);
+            codec_params.channels = Some(Channels::FRONT_CENTRE);
             codec_params
                 .with_sample_rate(AMR_SAMPLE_RATE)
                 .with_time_base(TimeBase::new(1, AMR_SAMPLE_RATE));

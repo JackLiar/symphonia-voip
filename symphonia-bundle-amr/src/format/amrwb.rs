@@ -91,7 +91,7 @@ impl QueryDescriptor for AmrwbReader {
 }
 
 impl FormatReader for AmrwbReader {
-    fn try_new(source: MediaSourceStream, options: &FormatOptions) -> Result<Self> {
+    fn try_new(source: MediaSourceStream, _options: &FormatOptions) -> Result<Self> {
         let mut amr = Self::new(source);
         let consumed = AMRWB_MIME_MAGIC.len();
 

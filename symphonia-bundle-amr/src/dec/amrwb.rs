@@ -10,7 +10,6 @@ use symphonia_core::codecs::{
 use symphonia_core::errors::Result;
 use symphonia_core::formats::Packet;
 use symphonia_core::support_codec;
-use symphonia_core::units::TimeBase;
 
 use opencore_amr_sys::{D_IF_decode, D_IF_exit, D_IF_init};
 
@@ -64,17 +63,12 @@ impl Drop for Decoder {
 }
 
 impl D for Decoder {
-    fn try_new(params: &CodecParameters, options: &DecoderOptions) -> Result<Self>
+    fn try_new(params: &CodecParameters, _options: &DecoderOptions) -> Result<Self>
     where
         Self: Sized,
     {
         let mut decoder = Self::new();
-        decoder.params.codec = CODEC_TYPE_AMRWB;
-        decoder.params.channels = Some(Channels::FRONT_CENTRE);
-        decoder
-            .params
-            .with_sample_rate(AMRWB_SAMPLE_RATE)
-            .with_time_base(TimeBase::new(1, AMRWB_SAMPLE_RATE));
+        decoder.params = params.clone();
         Ok(decoder)
     }
 
