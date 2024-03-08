@@ -1,12 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "evs-codec-sys",
-    "opencore-amr-sys",
-    "symphonia-bundle-amr",
-    "symphonia-bundle-evs",
-    "voip-replay",
-]
+members = ["evs-codec-sys", "opencore-amr-sys", "symphonia-bundle-amr", "symphonia-bundle-evs", "voip-replay"]
 
 [workspace.dependencies]
 anyhow = { version = "1" }
@@ -16,4 +10,4 @@ hex = "0.4"
 log = "0.4"
 num-derive = "0.4"
 num-traits = "0.2"
-symphonia-core = "0.5.3"
+symphonia-core = "0.5.4"
