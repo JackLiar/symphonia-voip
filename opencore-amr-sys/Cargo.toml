@@ -11,4 +11,5 @@ bindgen = { workspace = true, optional = true }
 cargo-emit = "0.2"
 
 [features]
+default = ["gen"]
 gen = ["bindgen"]
