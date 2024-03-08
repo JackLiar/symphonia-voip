@@ -1,14 +1,41 @@
-use std::env;
 use std::ffi::OsStr;
 use std::fs::read_dir;
 use std::path::Path;
+use std::{collections::HashSet, env};
+
+use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
 
 use anyhow::{anyhow, Result};
+
+#[derive(Debug)]
+struct IgnoreMacros(HashSet<&'static str>);
+
+impl ParseCallbacks for IgnoreMacros {
+    fn will_parse_macro(&self, name: &str) -> MacroParsingBehavior {
+        if self.0.contains(name) {
+            MacroParsingBehavior::Ignore
+        } else {
+            MacroParsingBehavior::Default
+        }
+    }
+}
 
 #[cfg(feature = "gen")]
 fn gen() -> Result<()> {
     let out_dir = env::var("OUT_DIR")?;
     let out_path = Path::new(&out_dir).join("evs_codec_sys.rs");
+
+    let ignored_macros = IgnoreMacros(
+        vec![
+            "FP_INFINITE",
+            "FP_NAN",
+            "FP_NORMAL",
+            "FP_SUBNORMAL",
+            "FP_ZERO",
+        ]
+        .into_iter()
+        .collect(),
+    );
 
     let bindings = bindgen::builder()
         .default_macro_constant_type(bindgen::MacroTypeVariation::Signed)
@@ -24,6 +51,7 @@ fn gen() -> Result<()> {
     let bindings = bindings.header("src/evs_codec.h");
 
     bindings
+        .parse_callbacks(Box::new(ignored_macros))
         .layout_tests(false)
         .generate()
         .unwrap_or_else(|e| panic!("could not run bindgen on header src/evs_codec.h, {}", e))
