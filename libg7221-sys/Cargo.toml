@@ -1,0 +1,17 @@
+[package]
+name = "libg7221-sys"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[build-dependencies]
+anyhow = { workspace = true }
+bindgen = { workspace = true, optional = true }
+cargo-emit = { workspace = true }
+cc = { workspace = true }
+sys-builder = { path = "../sys-builder" }
+
+[features]
+default = ["gen"]
+gen = ["bindgen"]

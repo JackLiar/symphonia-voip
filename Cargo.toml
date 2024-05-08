@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "evs-codec-sys",
+    "libg7221-sys",
     "opencore-amr-sys",
     "symphonia-bundle-amr",
     "symphonia-bundle-evs",
