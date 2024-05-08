@@ -1,10 +1,18 @@
 [workspace]
 resolver = "2"
-members = ["evs-codec-sys", "opencore-amr-sys", "symphonia-bundle-amr", "symphonia-bundle-evs", "voip-replay"]
+members = [
+    "evs-codec-sys",
+    "opencore-amr-sys",
+    "symphonia-bundle-amr",
+    "symphonia-bundle-evs",
+    "voip-replay",
+    "sys-builder",
+]
 
 [workspace.dependencies]
 anyhow = { version = "1" }
 bindgen = { version = "0.69" }
+cargo-emit = "0.2"
 cc = { version = "1.0", features = ["parallel"] }
 hex = "0.4"
 log = "0.4"
