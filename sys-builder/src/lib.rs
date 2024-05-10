@@ -1,7 +1,23 @@
+use std::collections::HashSet;
 use std::env;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
+use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
+
+/// https://github.com/rust-lang/rust-bindgen/issues/687#issuecomment-450750547
+#[derive(Debug)]
+pub struct IgnoreMacros(pub HashSet<&'static str>);
+
+impl ParseCallbacks for IgnoreMacros {
+    fn will_parse_macro(&self, name: &str) -> MacroParsingBehavior {
+        if self.0.contains(name) {
+            MacroParsingBehavior::Ignore
+        } else {
+            MacroParsingBehavior::Default
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub enum LinkType {
@@ -10,11 +26,11 @@ pub enum LinkType {
     Static,
 }
 
-impl ToString for LinkType {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for LinkType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Dynamic => "dylib".to_string(),
-            Self::Static => "static".to_string(),
+            Self::Dynamic => f.write_str("dylib"),
+            Self::Static => f.write_str("static"),
         }
     }
 }
