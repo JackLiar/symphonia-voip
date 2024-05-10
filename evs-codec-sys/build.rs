@@ -1,24 +1,11 @@
+use std::env;
 use std::ffi::OsStr;
 use std::fs::read_dir;
 use std::path::Path;
-use std::{collections::HashSet, env};
 
-use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
+use sys_builder::IgnoreMacros;
 
 use anyhow::{anyhow, Result};
-
-#[derive(Debug)]
-struct IgnoreMacros(HashSet<&'static str>);
-
-impl ParseCallbacks for IgnoreMacros {
-    fn will_parse_macro(&self, name: &str) -> MacroParsingBehavior {
-        if self.0.contains(name) {
-            MacroParsingBehavior::Ignore
-        } else {
-            MacroParsingBehavior::Default
-        }
-    }
-}
 
 #[cfg(feature = "gen")]
 fn gen() -> Result<()> {
