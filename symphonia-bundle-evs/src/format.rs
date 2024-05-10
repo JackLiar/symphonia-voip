@@ -34,7 +34,7 @@ impl EvsReaderBuilder {
     }
 
     /// Set timestamp interval
-    pub fn with_timestamp_interval(mut self, intv: u32) -> Self {
+    pub fn with_timestamp_interval(mut self, intv: u64) -> Self {
         self.0.timestamp_interval = intv;
         self
     }
@@ -53,7 +53,7 @@ pub struct EvsReader {
     chl_idx: usize,
     pkt_cnt: u64,
     pub sample_rate: Option<u32>,
-    pub timestamp_interval: u32,
+    pub timestamp_interval: u64,
 }
 
 impl EvsReader {
@@ -148,8 +148,8 @@ impl FormatReader for EvsReader {
 
         let pkt = Packet::new_from_boxed_slice(
             self.chl_idx as u32,
-            self.track_ts[self.chl_idx] * 320,
-            320,
+            self.track_ts[self.chl_idx] * self.timestamp_interval,
+            self.timestamp_interval,
             data,
         );
         self.track_ts[self.chl_idx] += 1;
