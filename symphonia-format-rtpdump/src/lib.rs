@@ -41,7 +41,7 @@ fn parse_src_ip() -> BinResult<Ipv4Addr> {
 #[binrw::parser(reader, endian)]
 fn parse_src_port() -> BinResult<u16> {
     let pos = reader.stream_position()?;
-    let port: &mut [u8] = &mut [0; 5];
+    let port: &mut [u8] = &mut [0; 6];
     let mut len = 0;
 
     for c in port.iter_mut() {
