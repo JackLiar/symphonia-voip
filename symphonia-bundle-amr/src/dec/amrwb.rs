@@ -27,20 +27,22 @@ pub struct Decoder {
     st: Box<AmrwbDecoder>,
 }
 
-impl Decoder {
-    pub fn new() -> Self {
+impl Default for Decoder {
+    fn default() -> Self {
         unsafe {
             Self {
                 decoded_data: AudioBuffer::new(
                     AMRWB_BUFFER_SIZE,
-                    SignalSpec::new(AMRWB_SAMPLE_RATE, Channels::all()),
+                    SignalSpec::new(AMRWB_SAMPLE_RATE, Channels::FRONT_CENTRE),
                 ),
                 params: CodecParameters::default(),
                 st: Box::from_raw(D_IF_init() as *mut _),
             }
         }
     }
+}
 
+impl Decoder {
     pub fn decode(&mut self, data: &[u8]) {
         unsafe {
             D_IF_decode(
@@ -57,7 +59,7 @@ impl Drop for Decoder {
     fn drop(&mut self) {
         unsafe {
             D_IF_exit(self.st.as_mut() as *mut AmrwbDecoder as _);
-            self.st = Box::new(AmrwbDecoder::default());
+            self.st = Box::<AmrwbDecoder>::default();
         }
     }
 }
@@ -67,7 +69,7 @@ impl D for Decoder {
     where
         Self: Sized,
     {
-        let mut decoder = Self::new();
+        let mut decoder = Self::default();
         decoder.params = params.clone();
         Ok(decoder)
     }

@@ -27,20 +27,22 @@ pub struct Decoder {
     st: Box<AmrDecoder>,
 }
 
-impl Decoder {
-    pub fn new() -> Self {
+impl Default for Decoder {
+    fn default() -> Self {
         unsafe {
             Self {
                 decoded_data: AudioBuffer::new(
                     AMR_BUFFER_SIZE,
-                    SignalSpec::new(AMR_SAMPLE_RATE, Channels::all()),
+                    SignalSpec::new(AMR_SAMPLE_RATE, Channels::FRONT_CENTRE),
                 ),
                 params: CodecParameters::default(),
                 st: Box::from_raw(Decoder_Interface_init() as _),
             }
         }
     }
+}
 
+impl Decoder {
     pub fn decode(&mut self, data: &[u8]) {
         unsafe {
             Decoder_Interface_Decode(
@@ -57,7 +59,7 @@ impl Drop for Decoder {
     fn drop(&mut self) {
         unsafe {
             Decoder_Interface_exit(self.st.as_mut() as *mut _ as _);
-            self.st = Box::new(AmrDecoder::default());
+            self.st = Box::<AmrDecoder>::default();
         }
     }
 }
@@ -67,7 +69,7 @@ impl D for Decoder {
     where
         Self: Sized,
     {
-        let mut decoder = Self::new();
+        let mut decoder = Self::default();
         decoder.params = params.clone();
         Ok(decoder)
     }
