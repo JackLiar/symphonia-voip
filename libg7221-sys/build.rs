@@ -19,7 +19,7 @@ fn gen() -> Result<()> {
         .collect(),
     );
 
-    let mut library = Library::new("libg722_1".to_string(), "LIBG7221_ROOT".to_string());
+    let mut library = Library::new("g722_1".to_string(), "LIBG7221_ROOT".to_string());
     find_lib(&mut library)
         .map_err(|e| anyhow!("Failed to find {} library, {}", library.name, e))?;
     let out_dir = env::var("OUT_DIR")?;
