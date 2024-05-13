@@ -12,6 +12,8 @@ symphonia = { version = "0.5.3" }
 
 symphonia-bundle-amr = { path = "../symphonia-bundle-amr" }
 symphonia-bundle-evs = { path = "../symphonia-bundle-evs" }
+symphonia-codec-g7221 = { path = "../symphonia-codec-g7221" }
+symphonia-format-rtpdump = { path = "../symphonia-format-rtpdump" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libpulse-binding = "2.5.0"

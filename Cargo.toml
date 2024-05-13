@@ -6,6 +6,7 @@ members = [
     "opencore-amr-sys",
     "symphonia-bundle-amr",
     "symphonia-bundle-evs",
+    "symphonia-format-rtpdump",
     "voip-replay",
     "sys-builder",
 ]

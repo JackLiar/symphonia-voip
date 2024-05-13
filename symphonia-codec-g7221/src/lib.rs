@@ -19,12 +19,14 @@ const G722_1_BIT_RATE_24000: u32 = g722_1_bit_rates_t_G722_1_BIT_RATE_24000;
 const G722_1_BIT_RATE_32000: u32 = g722_1_bit_rates_t_G722_1_BIT_RATE_32000;
 const G722_1_BIT_RATE_48000: u32 = g722_1_bit_rates_t_G722_1_BIT_RATE_48000;
 
-pub const CODEC_TYPE_G722_1: CodecType = decl_codec_type(b"g722.1");
+pub const CODEC_TYPE_G722_1: CodecType = decl_codec_type(b"g7221");
 
 pub struct Decoder {
     decoded_data: AudioBuffer<i16>,
     params: CodecParameters,
     st: g722_1_decode_state_t,
+    sample_rate: u32,
+    bit_per_sample: u32,
 }
 
 unsafe impl Send for Decoder {}
@@ -34,11 +36,13 @@ impl Decoder {
     pub fn new() -> Self {
         Self {
             decoded_data: AudioBuffer::new(
-                512,
-                SignalSpec::new(G722_1_SAMPLE_RATE_16000, Channels::all()),
+                G722_1_SAMPLE_RATE_16000 as u64 / 50,
+                SignalSpec::new(G722_1_SAMPLE_RATE_16000, Channels::FRONT_CENTRE),
             ),
             params: CodecParameters::default(),
             st: g722_1_decode_state_t::default(),
+            sample_rate: G722_1_SAMPLE_RATE_16000,
+            bit_per_sample: G722_1_BIT_RATE_24000,
         }
     }
 
@@ -54,20 +58,13 @@ impl Decoder {
     }
 }
 
-impl Drop for Decoder {
-    fn drop(&mut self) {
-        unsafe {
-            g722_1_decode_release(&mut self.st as *mut _);
-        }
-    }
-}
-
 impl D for Decoder {
     fn try_new(params: &CodecParameters, _options: &DecoderOptions) -> Result<Self>
     where
         Self: Sized,
     {
-        let sample_rate = match params.sample_rate {
+        let mut decoder = Self::new();
+        decoder.sample_rate = match params.sample_rate {
             Some(sr) if sr == G722_1_SAMPLE_RATE_16000 || sr == G722_1_SAMPLE_RATE_32000 => sr,
             _ => {
                 return Err(Error::Unsupported(
@@ -75,7 +72,7 @@ impl D for Decoder {
                 ))
             }
         };
-        let bit_rate = match params.bits_per_sample {
+        decoder.bit_per_sample = match params.bits_per_sample {
             Some(br)
                 if br == g722_1_bit_rates_t_G722_1_BIT_RATE_24000
                     || br == g722_1_bit_rates_t_G722_1_BIT_RATE_32000
@@ -89,10 +86,13 @@ impl D for Decoder {
                 ))
             }
         };
-        let mut decoder = Self::new();
         decoder.params = params.clone();
         unsafe {
-            let r = g722_1_decode_init(&mut decoder.st, bit_rate as c_int, sample_rate as c_int);
+            let r = g722_1_decode_init(
+                &mut decoder.st,
+                decoder.bit_per_sample as _,
+                decoder.sample_rate as _,
+            );
             if r.is_null() {
                 return Err(Error::DecodeError("Failed to initialize G.722.1 Decoder"));
             }
@@ -101,11 +101,17 @@ impl D for Decoder {
     }
 
     fn reset(&mut self) {
-        // unsafe {
-        //     Decoder_Interface_exit(self.st.as_mut() as *mut _ as _);
-        //     self.st = Box::from_raw(Decoder_Interface_init() as _);
-        // }
-        // self.decoded_data.clear();
+        std::mem::take(&mut self.st);
+        unsafe {
+            let r = g722_1_decode_init(
+                &mut self.st,
+                self.bit_per_sample as _,
+                self.sample_rate as _,
+            );
+            if r.is_null() {
+                panic!("Failed to initialize G.722.1 Decoder");
+            }
+        }
     }
 
     fn supported_codecs() -> &'static [CodecDescriptor] {
@@ -118,7 +124,8 @@ impl D for Decoder {
 
     fn decode(&mut self, packet: &Packet) -> Result<AudioBufferRef> {
         self.decoded_data.clear();
-        self.decoded_data.render_reserved(Some(2 * 640 as usize));
+        self.decoded_data
+            .render_reserved(Some(self.sample_rate as usize / 50));
 
         self.decode(&packet.data);
 

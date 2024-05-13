@@ -109,12 +109,14 @@ fn main() {
     registry.register_all::<symphonia_bundle_evs::dec::Decoder>();
     registry.register_all::<symphonia_bundle_amr::AmrDecoder>();
     registry.register_all::<symphonia_bundle_amr::AmrwbDecoder>();
+    registry.register_all::<symphonia_codec_g7221::Decoder>();
 
     let mut probe = Probe::default();
     register_enabled_formats(&mut probe);
     probe.register_all::<symphonia_bundle_evs::format::EvsReader>();
     probe.register_all::<symphonia_bundle_amr::AmrReader>();
     probe.register_all::<symphonia_bundle_amr::AmrwbReader>();
+    probe.register_all::<symphonia_format_rtpdump::RtpdumpReader>();
 
     // For any error, return an exit code -1. Otherwise return the exit code provided.
     let code = match run(&args, registry, probe) {
