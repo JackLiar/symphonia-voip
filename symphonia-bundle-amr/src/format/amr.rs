@@ -37,7 +37,7 @@ impl AmrToc {
     }
 
     pub fn payload_size(&self) -> Option<usize> {
-        Self::AMR_PAYLOAD_SIZES.get(self.ft()).map(|s| *s)
+        Self::AMR_PAYLOAD_SIZES.get(self.ft()).copied()
     }
 }
 
@@ -137,7 +137,7 @@ impl FormatReader for AmrReader {
         self.track_ts[self.chl_idx] += 1;
 
         // update internal channel index
-        self.chl_idx = (self.chl_idx) / self.channels;
+        self.chl_idx /= self.channels;
 
         Ok(pkt)
     }

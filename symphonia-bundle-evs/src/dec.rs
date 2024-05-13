@@ -85,7 +85,8 @@ impl D for Decoder {
             unsafe { u8_slice_to_any::<DecoderParams>(params.extra_data.as_ref().unwrap()) };
         let mut decoder = Self::default();
         decoder.decode_param = param.clone();
-        decoder.decoded_data = AudioBuffer::new(960, SignalSpec::new(16000, Channels::all()));
+        decoder.decoded_data =
+            AudioBuffer::new(960, SignalSpec::new(16000, Channels::FRONT_CENTRE));
 
         decoder.raw.bitstreamformat = MIME as Word16;
         decoder.raw.output_Fs = 16000;

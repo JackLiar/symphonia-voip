@@ -1,0 +1,8 @@
+[package]
+name = "symphonia-codec-g7221"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libg7221-sys = { path = "../libg7221-sys" }
+symphonia-core = { workspace = true }

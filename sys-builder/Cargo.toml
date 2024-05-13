@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+bindgen = { workspace = true }
 cargo-emit = { workspace = true }
+
 
 [features]

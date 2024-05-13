@@ -141,7 +141,7 @@ impl FormatReader for AmrwbReader {
         self.track_ts[self.chl_idx] += 1;
 
         // update internal channel index
-        self.chl_idx = (self.chl_idx) / self.channels;
+        self.chl_idx /= self.channels;
 
         Ok(pkt)
     }

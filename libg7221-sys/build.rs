@@ -1,13 +1,25 @@
 use anyhow::{anyhow, Result};
 
-use sys_builder::{find_lib, Library};
+use sys_builder::{find_lib, IgnoreMacros, Library};
 
 #[cfg(feature = "gen")]
 fn gen() -> Result<()> {
     use std::env;
     use std::path::Path;
 
-    let mut library = Library::new("libg722_1".to_string(), "LIBG7221_ROOT".to_string());
+    let ignored_macros = IgnoreMacros(
+        vec![
+            "FP_INFINITE",
+            "FP_NAN",
+            "FP_NORMAL",
+            "FP_SUBNORMAL",
+            "FP_ZERO",
+        ]
+        .into_iter()
+        .collect(),
+    );
+
+    let mut library = Library::new("g722_1".to_string(), "LIBG7221_ROOT".to_string());
     find_lib(&mut library)
         .map_err(|e| anyhow!("Failed to find {} library, {}", library.name, e))?;
     let out_dir = env::var("OUT_DIR")?;
@@ -43,6 +55,7 @@ fn gen() -> Result<()> {
     }
 
     bindings
+        .parse_callbacks(Box::new(ignored_macros))
         .layout_tests(false)
         .generate()
         .unwrap_or_else(|e| panic!("could not run bindgen on header src/amrwb.h, {}", e))
