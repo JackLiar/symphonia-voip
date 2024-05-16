@@ -1,8 +1,11 @@
-use std::io::{Error as IOError, Read};
+use std::io::{Error as IOError, ErrorKind, Read, Seek, SeekFrom};
 use std::net::Ipv4Addr;
+use std::path::Path;
 use std::str::FromStr;
 
 use binrw::{BinRead, BinResult};
+use codec_detector::rtp::RawRtpPacket;
+use codec_detector::{Codec, CodecDetector};
 use symphonia_core::audio::Channels;
 use symphonia_core::codecs::CodecParameters;
 use symphonia_core::errors::{seek_error, Error, Result, SeekErrorKind};
@@ -15,12 +18,16 @@ use symphonia_core::probe::{Descriptor, Instantiate, QueryDescriptor};
 use symphonia_core::support_format;
 use symphonia_core::units::TimeBase;
 
+use symphonia_bundle_amr::{CODEC_TYPE_AMR, CODEC_TYPE_AMRWB};
+use symphonia_bundle_evs::dec::CODEC_TYPE_EVS;
+use symphonia_codec_g7221::CODEC_TYPE_G722_1;
+
 const MAGIC: &[u8] = b"#!rtpplay1.0 ";
 
 #[binrw::parser(reader, endian)]
 fn parse_src_ip() -> BinResult<Ipv4Addr> {
     let pos = reader.stream_position()?;
-    let ip: &mut [u8] = &mut [0; 15];
+    let ip: &mut [u8] = &mut [0; 16];
     let mut len = 0;
 
     for c in ip.iter_mut() {
@@ -108,8 +115,8 @@ pub struct RtpdumpReader {
     track_ts: Vec<u64>,
     cues: Vec<Cue>,
     metadata: MetadataLog,
-    channels: usize,
-    chl_idx: usize,
+    ssrcs: Vec<u32>,
+    track_idx: usize,
     pkt_cnt: u64,
     pub sample_rate: Option<u32>,
     pub timestamp_interval: u64,
@@ -131,6 +138,37 @@ impl QueryDescriptor for RtpdumpReader {
     }
 }
 
+fn read_rd_pkt(source: &mut MediaSourceStream) -> Result<Box<[u8]>> {
+    let len = source.read_be_u16()?;
+    let org_len = source.read_be_u16()?;
+    let offset = source.read_be_u32()?;
+    let pkt = RDPacket {
+        len,
+        org_len,
+        offset,
+    };
+    Ok(source.read_boxed_slice_exact(pkt.org_len as usize)?)
+}
+
+fn codec_to_param(codec: &Codec) -> Option<CodecParameters> {
+    let mut params = CodecParameters::new();
+    params
+        .with_sample_rate(codec.sample_rate)
+        .with_time_base(TimeBase::new(1, codec.sample_rate))
+        .with_channels(Channels::FRONT_CENTRE);
+    if let Some(br) = codec.bit_rate {
+        params.with_bits_per_sample(br);
+    }
+    params.codec = match codec.name.as_str() {
+        "amr" => CODEC_TYPE_AMR,
+        "amrwb" => CODEC_TYPE_AMRWB,
+        "evs" => CODEC_TYPE_EVS,
+        "G.722.1" => CODEC_TYPE_G722_1,
+        _ => return None,
+    };
+    Some(params)
+}
+
 impl FormatReader for RtpdumpReader {
     fn try_new(mut source: MediaSourceStream, options: &FormatOptions) -> Result<Self>
     where
@@ -141,6 +179,7 @@ impl FormatReader for RtpdumpReader {
             Err(binrw::Error::Io(e)) => return Err(Error::IoError(e)),
             Err(_) => return Err(Error::DecodeError("Failed to decode rtpdump header")),
         };
+        let hdr_len = source.pos();
 
         let mut r = Self {
             reader: source,
@@ -148,25 +187,40 @@ impl FormatReader for RtpdumpReader {
             track_ts: vec![],
             cues: vec![],
             metadata: Default::default(),
-            channels: 0,
-            chl_idx: 0,
+            ssrcs: vec![],
+            track_idx: 0,
             pkt_cnt: 0,
             sample_rate: None,
             timestamp_interval: 320,
         };
 
-        let mut codec_params = CodecParameters::new();
-        let sr = 16000;
-        codec_params.codec = symphonia_codec_g7221::CODEC_TYPE_G722_1;
-        codec_params.channels = Some(Channels::FRONT_CENTRE);
-        codec_params
-            .with_bits_per_sample(24000)
-            .with_sample_rate(sr)
-            .with_time_base(TimeBase::new(1, sr));
+        let mut detector = CodecDetector::new();
+        detector.get_features_from_yaml(Path::new("codec.yaml"));
+        loop {
+            let pkt = match read_rd_pkt(&mut r.reader) {
+                Ok(pkt) => pkt,
+                Err(Error::IoError(e)) => {
+                    if e.kind() == ErrorKind::UnexpectedEof {
+                        break;
+                    } else {
+                        return Err(Error::IoError(e));
+                    }
+                }
+                Err(e) => return Err(e),
+            };
+            let pkt = RawRtpPacket::new(pkt.as_ref());
+            detector.on_pkt(&pkt);
+        }
 
-        r.channels = 1;
-        r.tracks.push(Track::new(0, codec_params));
-        r.track_ts.push(0);
+        let result = detector.get_result();
+
+        r.reader.seek(SeekFrom::Start(hdr_len))?;
+        for (id, (pt, codec)) in result.iter().enumerate() {
+            let param =
+                codec_to_param(&codec).ok_or_else(|| Error::Unsupported("Unsupported codec"))?;
+            r.tracks.push(Track::new(id as u32, param));
+            r.track_ts.push(0);
+        }
         Ok(r)
     }
 
@@ -181,8 +235,8 @@ impl FormatReader for RtpdumpReader {
         };
         let data = self.reader.read_boxed_slice_exact(pkt.org_len as usize)?;
         let pkt = Packet::new_from_slice(
-            self.chl_idx as u32,
-            self.track_ts[self.chl_idx] * self.timestamp_interval,
+            self.track_idx as u32,
+            self.track_ts[self.track_idx] * self.timestamp_interval,
             self.timestamp_interval,
             &data[12..],
         );
