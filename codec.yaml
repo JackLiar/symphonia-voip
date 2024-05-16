@@ -1,0 +1,111 @@
+# amr
+- name: amr
+  sampleRate: 8000
+  payloadSize: 33
+  deltaTime: 160
+- name: amr
+  sampleRate: 8000
+  payloadSize: 28
+  deltaTime: 160
+- name: amrbe
+  sampleRate: 8000
+  payloadSize: 32
+  deltaTime: 160
+
+# amrwb
+- name: amrwb
+  sampleRate: 16000
+  payloadSize: 62
+  deltaTime: 320
+
+# evs
+- name: evs
+  sampleRate: 8000
+  payloadSize: 33
+  deltaTime: 320
+- name: evs
+  sampleRate: 16000
+  payloadSize: 33
+  deltaTime: 320
+- name: evs
+  sampleRate: 24000
+  payloadSize: 33
+  deltaTime: 320
+- name: evs
+  sampleRate: 32000
+  payloadSize: 33
+  deltaTime: 320
+
+# speex
+- name: speex
+  sampleRate: 8000
+  payloadSize: 28
+  deltaTime: 160
+- name: speex
+  sampleRate: 16000
+  payloadSize: 42
+  deltaTime: 320
+- name: speex
+  sampleRate: 32000
+  payloadSize: 47
+  deltaTime: 640
+
+# G.7222.1
+- name: G.722.1
+  sampleRate: 16000
+  payloadSize: 60
+  deltaTime: 320
+  bitRate: 24000
+- name: G.722.1
+  sampleRate: 32000
+  payloadSize: 60
+  deltaTime: 640
+  bitRate: 24000
+
+- name: G.726
+  sampleRate: 8000
+  payloadSize: 20
+  deltaTime: 80
+- name: G.726
+  sampleRate: 8000
+  payloadSize: 60
+  deltaTime: 240
+
+- name: G.726
+  sampleRate: 8000
+  payloadSize: 30
+  deltaTime: 80
+- name: G.726
+  sampleRate: 8000
+  payloadSize: 90
+  deltaTime: 240
+
+- name: G.726
+  sampleRate: 8000
+  payloadSize: 40
+  deltaTime: 80
+- name: G.726
+  sampleRate: 8000
+  payloadSize: 120
+  deltaTime: 240
+
+- name: G.726
+  sampleRate: 8000
+  payloadSize: 50
+  deltaTime: 80
+- name: G.726
+  sampleRate: 8000
+  payloadSize: 150
+  deltaTime: 240
+
+- name: OPUS
+  sampleRate: 48000
+  deltaTime: 960
+
+- name: SILK
+  sampleRate: 8000
+  deltaTime: 320
+
+- name: SILK
+  sampleRate: 16000
+  deltaTime: 320
