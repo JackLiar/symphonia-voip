@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-binrw = "0.13"
+binrw = "0.14"
 codec-detector = { path = "../codec-detector" }
 symphonia-core = { workspace = true }
 symphonia-bundle-amr = { path = "../symphonia-bundle-amr" }
