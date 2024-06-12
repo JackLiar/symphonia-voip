@@ -8,7 +8,7 @@ clap = "4"
 lazy_static = "1"
 log = { version = "0.4", features = ["release_max_level_info"] }
 pretty_env_logger = "0.5"
-symphonia = { version = "0.5.3" }
+symphonia = "0.5.4"
 
 symphonia-bundle-amr = { path = "../symphonia-bundle-amr" }
 symphonia-bundle-evs = { path = "../symphonia-bundle-evs" }
