@@ -36,7 +36,7 @@ impl Default for Decoder {
                     SignalSpec::new(AMR_SAMPLE_RATE, Channels::FRONT_CENTRE),
                 ),
                 params: CodecParameters::default(),
-                st: Box::from_raw(Decoder_Interface_init() as _),
+                st: Box::from_raw(Decoder_Interface_init().cast()),
             }
         }
     }
@@ -46,7 +46,7 @@ impl Decoder {
     pub fn decode(&mut self, data: &[u8]) {
         unsafe {
             Decoder_Interface_Decode(
-                self.st.as_mut() as *mut _ as _,
+                (self.st.as_mut() as *mut AmrDecoder).cast(),
                 data.as_ptr(),
                 self.decoded_data.chan_mut(0).as_mut_ptr(),
                 0,
@@ -58,7 +58,7 @@ impl Decoder {
 impl Drop for Decoder {
     fn drop(&mut self) {
         unsafe {
-            Decoder_Interface_exit(self.st.as_mut() as *mut _ as _);
+            Decoder_Interface_exit((self.st.as_mut() as *mut AmrDecoder).cast());
             self.st = Box::<AmrDecoder>::default();
         }
     }
@@ -76,8 +76,8 @@ impl D for Decoder {
 
     fn reset(&mut self) {
         unsafe {
-            Decoder_Interface_exit(self.st.as_mut() as *mut _ as _);
-            self.st = Box::from_raw(Decoder_Interface_init() as _);
+            Decoder_Interface_exit((self.st.as_mut() as *mut AmrDecoder).cast());
+            self.st = Box::from_raw(Decoder_Interface_init().cast());
         }
         self.decoded_data.clear();
     }
