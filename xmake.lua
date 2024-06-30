@@ -1,6 +1,6 @@
 set_policy("package.install_locally", true)
 
-add_requires("opencore-amr", {system = false})
+add_requires("opencore-amr", {system = false, configs = {shared = true}})
 add_requires("libtool", {system = false})
 add_requires("g7221", {system = false})
 
