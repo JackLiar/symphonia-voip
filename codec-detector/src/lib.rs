@@ -22,6 +22,7 @@ pub struct Codec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub channels: Option<u8>,
     pub bit_rate: Option<u32>,
+    pub params: Option<String>,
 }
 
 impl Codec {
@@ -31,6 +32,7 @@ impl Codec {
             sample_rate,
             channels,
             bit_rate: None,
+            params: None,
         }
     }
 }
