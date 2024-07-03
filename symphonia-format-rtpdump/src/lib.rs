@@ -7,7 +7,7 @@ use binrw::{BinRead, BinResult};
 use codec_detector::rtp::RawRtpPacket;
 use codec_detector::{Codec, CodecDetector};
 use symphonia_core::audio::Channels;
-use symphonia_core::codecs::CodecParameters;
+use symphonia_core::codecs::{CodecParameters, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW};
 use symphonia_core::errors::{seek_error, Error, Result, SeekErrorKind};
 use symphonia_core::formats::{
     Cue, FormatOptions, FormatReader, Packet, SeekMode, SeekTo, SeekedTo, Track,
@@ -156,14 +156,21 @@ fn codec_to_param(codec: &Codec) -> Option<CodecParameters> {
         .with_sample_rate(codec.sample_rate)
         .with_time_base(TimeBase::new(1, codec.sample_rate))
         .with_channels(Channels::FRONT_CENTRE);
+
     if let Some(br) = codec.bit_rate {
         params.with_bits_per_sample(br);
     }
+    if let Some(frames) = codec.max_frames_per_packet {
+        params.with_max_frames_per_packet(160);
+    }
+
     params.codec = match codec.name.as_str() {
         "amr" => CODEC_TYPE_AMR,
         "amrwb" => CODEC_TYPE_AMRWB,
         "evs" => CODEC_TYPE_EVS,
         "G.722.1" => CODEC_TYPE_G722_1,
+        "pcma" => CODEC_TYPE_PCM_ALAW,
+        "pcmu" => CODEC_TYPE_PCM_MULAW,
         _ => return None,
     };
     Some(params)
@@ -234,10 +241,17 @@ impl FormatReader for RtpdumpReader {
             offset,
         };
         let data = self.reader.read_boxed_slice_exact(pkt.org_len as usize)?;
+        let track = &self.tracks()[self.track_idx];
+
+        let sr = track
+            .codec_params
+            .sample_rate
+            .ok_or_else(|| Error::Unsupported("Unknown sample rate"))?;
+
         let pkt = Packet::new_from_slice(
             self.track_idx as u32,
-            self.track_ts[self.track_idx] * self.timestamp_interval,
-            self.timestamp_interval,
+            self.track_ts[self.track_idx] * (sr as u64) / 50,
+            (sr / 50) as u64,
             &data[12..],
         );
         self.track_ts[self.track_idx] += 1;
