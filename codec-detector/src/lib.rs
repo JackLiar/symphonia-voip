@@ -23,6 +23,7 @@ pub struct Codec {
     pub channels: Option<u8>,
     pub bit_rate: Option<u32>,
     pub params: Option<String>,
+    pub payload_type: Option<u8>,
 }
 
 impl Codec {
@@ -33,6 +34,7 @@ impl Codec {
             channels,
             bit_rate: None,
             params: None,
+            payload_type: None,
         }
     }
 }
@@ -108,6 +110,21 @@ impl CodecDetector {
         };
     }
 
+    fn update_codec_stat(&mut self, pt: PayloadType, codec: &Codec) {
+        match self.codec_stat.get_mut(&pt) {
+            None => {
+                let mut stat = HashMap::new();
+                stat.insert(codec.clone(), 1);
+                self.codec_stat.insert(pt, stat);
+            }
+            Some(stat) => {
+                if let Some(stat) = stat.get_mut(codec) {
+                    *stat += 1;
+                }
+            }
+        }
+    }
+
     fn is_dynamic_len<P: RtpPacket>(&mut self, pkt: &P) -> bool {
         match self.payload_size_stat.get(&pkt.payload_type()) {
             None => unreachable!("payload_size_stat always have incoming RTP payload type"),
@@ -130,8 +147,20 @@ impl CodecDetector {
     }
 
     pub fn on_pkt<P: RtpPacket>(&mut self, pkt: &P) {
-        if parse_rtp_event(pkt.payload()).is_ok() || !pkt.payload_type().is_dynamic() {
-            // Filter out all RTP event pkts and non dynamic codec pkts
+        // Filter out all RTP event pkts and non dynamic codec pkts
+        if parse_rtp_event(pkt.payload()).is_ok() {
+            return;
+        }
+
+        if !pkt.payload_type().is_dynamic() {
+            let codec = self
+                .features
+                .iter()
+                .find(|(codec, _)| codec.payload_type == Some(pkt.payload_type().to_u8()))
+                .map(|(codec, _)| codec.clone());
+            if let Some(codec) = codec {
+                self.update_codec_stat(pkt.payload_type(), &codec);
+            }
             return;
         }
 
