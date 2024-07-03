@@ -51,7 +51,7 @@ impl Decoder {
                 (self.st.as_mut() as *mut AmrwbDecoder).cast(),
                 data.as_ptr(),
                 self.decoded_data.chan_mut(0).as_mut_ptr(),
-                toc.q() as c_int,
+                !toc.q() as c_int,
             )
         }
     }
