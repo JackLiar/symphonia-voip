@@ -20,7 +20,7 @@ const AMR_MC_MIME_MAGIC: &[u8] = b"#!AMR_MC1.0\n";
 
 /// See RFC 4867 section 5.3
 #[derive(Clone, Copy, Debug)]
-struct AmrToc(pub u8);
+pub struct AmrToc(pub u8);
 
 impl AmrToc {
     const AMR_PAYLOAD_SIZES: &'static [usize] =

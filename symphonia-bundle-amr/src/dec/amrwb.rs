@@ -1,4 +1,4 @@
-use std::ffi::c_short;
+use std::ffi::{c_int, c_short};
 
 use symphonia_core::audio::{
     AsAudioBufferRef, AudioBuffer, AudioBufferRef, Channels, Signal, SignalSpec,
@@ -13,6 +13,7 @@ use symphonia_core::support_codec;
 
 use opencore_amr_sys::{D_IF_decode, D_IF_exit, D_IF_init};
 
+use crate::format::AmrwbToc;
 use crate::{AMRWB_BUFFER_SIZE, AMRWB_SAMPLE_RATE};
 
 pub const CODEC_TYPE_AMRWB: CodecType = decl_codec_type(b"amrwb");
@@ -44,12 +45,13 @@ impl Default for Decoder {
 
 impl Decoder {
     pub fn decode(&mut self, data: &[u8]) {
+        let toc = AmrwbToc(data[0]);
         unsafe {
             D_IF_decode(
                 (self.st.as_mut() as *mut AmrwbDecoder).cast(),
                 data.as_ptr(),
                 self.decoded_data.chan_mut(0).as_mut_ptr(),
-                0,
+                toc.q() as c_int,
             )
         }
     }

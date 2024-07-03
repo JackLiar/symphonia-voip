@@ -20,7 +20,7 @@ const AMRWB_MC_MIME_MAGIC: &[u8] = b"#!AMR-WB_MC1.0\n";
 
 /// See RFC 4867 section 5.3
 #[derive(Clone, Copy, Debug)]
-struct AmrwbToc(pub u8);
+pub struct AmrwbToc(pub u8);
 
 impl AmrwbToc {
     const AMRWB_PAYLOAD_SIZES: &'static [isize] =

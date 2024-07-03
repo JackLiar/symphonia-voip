@@ -1,4 +1,4 @@
 mod amr;
 mod amrwb;
-pub use amr::AmrReader;
-pub use amrwb::AmrwbReader;
+pub use amr::{AmrReader, AmrToc};
+pub use amrwb::{AmrwbReader, AmrwbToc};
