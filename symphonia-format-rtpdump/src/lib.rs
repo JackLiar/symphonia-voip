@@ -240,6 +240,7 @@ impl FormatReader for RtpdumpReader {
             self.timestamp_interval,
             &data[12..],
         );
+        self.track_ts[self.track_idx] += 1;
         Ok(pkt)
     }
 
