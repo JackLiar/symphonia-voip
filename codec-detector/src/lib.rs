@@ -23,6 +23,7 @@ pub struct Codec {
     pub channels: Option<u8>,
     pub bit_rate: Option<u32>,
     pub params: Option<String>,
+    pub max_frames_per_packet: Option<u64>,
     pub payload_type: Option<u8>,
 }
 
@@ -34,6 +35,7 @@ impl Codec {
             channels,
             bit_rate: None,
             params: None,
+            max_frames_per_packet: None,
             payload_type: None,
         }
     }
