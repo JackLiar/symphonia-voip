@@ -174,13 +174,8 @@ impl CodecDetector {
             Some(cnt) => *cnt += 1,
         };
 
-        if (pkt.seq() - self.last_seq(pkt)) != 1 {
-            self.last_seq.insert(pkt.ssrc(), pkt.seq());
-            self.last_ts.insert(pkt.ssrc(), pkt.ts());
-            return;
-        }
-
-        let delta_time = pkt.ts().wrapping_sub(self.last_ts(pkt));
+        let delta_time = pkt.ts().wrapping_sub(self.last_ts(pkt))
+            / (pkt.seq().wrapping_sub(self.last_seq(pkt))) as u32;
         self.last_seq.insert(pkt.ssrc(), pkt.seq());
         self.last_ts.insert(pkt.ssrc(), pkt.ts());
 
