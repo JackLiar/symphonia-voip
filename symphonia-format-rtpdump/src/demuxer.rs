@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use itertools::Itertools;
 
-use codec_detector::rtp::RtpPacket;
+use codec_detector::rtp::{RawRtpPacket, RtpPacket};
 
 #[derive(Clone, Debug, Default)]
 pub struct SimpleRtpPacket {
@@ -19,6 +19,14 @@ impl RtpPacket for SimpleRtpPacket {
 impl SimpleRtpPacket {
     pub fn new(raw: Vec<u8>) -> Self {
         Self { raw }
+    }
+}
+
+impl From<&RawRtpPacket<'_>> for SimpleRtpPacket {
+    fn from(value: &RawRtpPacket) -> Self {
+        Self {
+            raw: value.raw().to_vec(),
+        }
     }
 }
 
@@ -104,7 +112,7 @@ impl<R: RtpPacket> Channel<R> {
     pub fn pkt_queue_len(&self) -> usize {
         match (self.pkts.front(), self.pkts.back()) {
             (Some(first), Some(last)) => {
-                println!("first: {}, lst: {}", first.ts(), last.ts());
+                // println!("first: {}, lst: {}", first.ts(), last.ts());
                 (last.ts().wrapping_sub(first.ts()) / self.delta_time) as usize + 1
             }
             _ => 0,
@@ -251,6 +259,14 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
         }
 
         Some(result)
+    }
+
+    pub fn get_all_pkts(&mut self, queue: &mut VecDeque<R>) {
+        for mut chl in self.chls.iter_mut() {
+            for pkt in chl.pkts.drain(..) {
+                queue.push_back(pkt);
+            }
+        }
     }
 }
 
