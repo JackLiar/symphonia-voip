@@ -20,6 +20,16 @@ impl SimpleRtpPacket {
     pub fn new(raw: Vec<u8>) -> Self {
         Self { raw }
     }
+
+    pub fn new_ssrc_dummy(ssrc: u32) -> Self {
+        let ssrc = ssrc.to_be_bytes();
+        let mut raw = vec![0; 12];
+        raw[8] = ssrc[0];
+        raw[9] = ssrc[1];
+        raw[10] = ssrc[2];
+        raw[11] = ssrc[3];
+        Self { raw }
+    }
 }
 
 impl From<&RawRtpPacket<'_>> for SimpleRtpPacket {
@@ -28,72 +38,6 @@ impl From<&RawRtpPacket<'_>> for SimpleRtpPacket {
             raw: value.raw().to_vec(),
         }
     }
-}
-
-/// Sort RTP packets by seq num and remove RTP packet retransmission
-///
-/// What this function actually do is inplace sort and filter.
-/// We needs to guarantee each ssrc's packet is uniq and sorted by seq num.
-/// Meanwhile rtp packet's original relative location in the whole sequence is maintained,
-/// so that we could play them at the appoperate time.
-/// Tough relative location is unlikely to be 100% correct,
-/// but few sample mis ordered is not that serious.
-///
-/// This function is not memory efficient nor cpu efficient at all,
-/// what we trying to guarantee is the process logic is correct.
-pub fn sort_and_uniq<R: RtpPacket>(pkts: Vec<(Duration, R)>) -> Vec<(Duration, R)> {
-    // vec![None; pkts.len()] require R to implement Clone, this way could bypass the restriction
-    let mut result = Vec::with_capacity(pkts.len());
-    for _ in 0..pkts.len() {
-        result.push(None)
-    }
-
-    // split RTP pkts by ssrc
-    let mut ssrc_pkts = vec![];
-    for (i, (ts, pkt)) in pkts.into_iter().enumerate() {
-        match ssrc_pkts.iter_mut().find(|(ssrc, _)| *ssrc == pkt.ssrc()) {
-            None => {
-                let ssrc = pkt.ssrc();
-                let pkts = vec![(i, (ts, pkt))];
-                ssrc_pkts.push((ssrc, vec![pkts]));
-            }
-            Some((_, pkts)) => {
-                let seq = pkt.seq();
-                pkts.last_mut().unwrap().push((i, (ts, pkt)));
-                if seq == 65535 {
-                    pkts.push(vec![])
-                }
-            }
-        }
-    }
-
-    for (_, bucket) in ssrc_pkts {
-        // Remove any single 65535 packet bucket, the reason this kind of bucket exists
-        // is 65535 packet get retransmitted.
-        // Then remove all retransmitted rtp pkts in this bucket
-        // Finally sort all packets in this bucket and put it in results
-        bucket
-            .into_iter()
-            .filter(|b| !(b.len() == 1 && b[0].1 .1.seq() == 65535))
-            .map(|b| {
-                b.into_iter()
-                    .unique_by(|(_, pkt)| pkt.1.seq())
-                    .collect::<Vec<_>>()
-            })
-            .flat_map(|b| {
-                let (idxs, mut pkts): (Vec<_>, Vec<_>) = b.into_iter().unzip();
-                pkts.sort_by_key(|(_, pkt)| pkt.seq());
-                idxs.into_iter().zip(pkts).collect::<Vec<_>>()
-            })
-            .for_each(|(idx, (ts, pkt))| {
-                result[idx] = Some((ts, pkt));
-            });
-    }
-    result
-        .into_iter()
-        .filter(|x| x.is_some())
-        .flatten()
-        .collect::<Vec<_>>()
 }
 
 #[derive(Default)]
@@ -178,6 +122,19 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
         }
     }
 
+    fn need_align(&self) -> bool {
+        if self.chls.len() == 1 {
+            // if there is only one channel, no needs to align
+            return false;
+        }
+
+        // some channel just receives its first packet
+        let cond1 = self.chls.iter().any(|c| c.pkts.len() == 1);
+        // more than one channels have recieve packets already
+        let cond2 = self.chls.iter().filter(|c| c.pkts.is_empty()).count() > 1;
+        return cond1 && cond2;
+    }
+
     /// Add new rtp pkt into interval buffer, return whether found a new ssrc channel
     /// If found a new channel, all existing pkts needs to be processed so channels could be aligned
     pub fn add_pkt(&mut self, pkt: R) -> bool {
@@ -209,27 +166,13 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
             }
         };
 
-        if self.chls.len() == 1 {
-            // if there is only one channel, no needs to align
-            return false;
-        }
-
-        // some channel just receives its first packet
-        let cond1 = self.chls.iter().any(|c| c.pkts.len() == 1);
-        // more than one channels have recieve packets already
-        let cond2 = self.chls.iter().filter(|c| c.pkts.is_empty()).count() > 1;
-        return cond1 && cond2;
+        return self.need_align();
     }
 
     fn any_queue_full(&self) -> bool {
         self.chls
             .iter()
             .any(|chl| chl.is_queue_full(self.sort_uniq_queue_size))
-    }
-
-    fn sort_uniq_add_sildence_frame(pkts: Vec<R>) -> Vec<R> {
-        pkts.iter().unique_by(|pkt| pkt.seq());
-        vec![]
     }
 
     pub fn get_pkts(&mut self, need_align: bool) -> Option<Vec<(u32, VecDeque<R>)>> {
@@ -267,6 +210,26 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
                 queue.push_back(pkt);
             }
         }
+    }
+}
+
+pub fn insert_silence_dummy_pkt<I: Iterator<Item = SimpleRtpPacket>>(
+    pkts: I,
+    cache: &mut VecDeque<SimpleRtpPacket>,
+    delta_time: u32,
+) {
+    let mut last_ts = None;
+    for pkt in pkts {
+        if let Some(ts) = last_ts {
+            let loss = pkt.ts().wrapping_sub(ts) / delta_time;
+            if loss != 0 {
+                for _ in 0..loss {
+                    let dummy = SimpleRtpPacket::new_ssrc_dummy(pkt.ssrc());
+                    cache.push_back(dummy);
+                }
+            }
+        }
+        cache.push_back(pkt);
     }
 }
 
