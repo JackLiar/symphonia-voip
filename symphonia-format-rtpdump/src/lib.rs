@@ -22,6 +22,8 @@ use symphonia_bundle_amr::{CODEC_TYPE_AMR, CODEC_TYPE_AMRWB};
 use symphonia_bundle_evs::dec::CODEC_TYPE_EVS;
 use symphonia_codec_g7221::CODEC_TYPE_G722_1;
 
+mod demuxer;
+
 const MAGIC: &[u8] = b"#!rtpplay1.0 ";
 
 #[binrw::parser(reader, endian)]
