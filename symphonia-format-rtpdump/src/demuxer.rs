@@ -1,9 +1,6 @@
 use std::collections::VecDeque;
-use std::time::Duration;
 
-use itertools::Itertools;
-
-use codec_detector::rtp::{RawRtpPacket, RtpPacket};
+use codec_detector::rtp::{PayloadType, RawRtpPacket, RtpPacket};
 
 #[derive(Clone, Debug, Default)]
 pub struct SimpleRtpPacket {
@@ -17,13 +14,10 @@ impl RtpPacket for SimpleRtpPacket {
 }
 
 impl SimpleRtpPacket {
-    pub fn new(raw: Vec<u8>) -> Self {
-        Self { raw }
-    }
-
-    pub fn new_ssrc_dummy(ssrc: u32) -> Self {
+    pub fn new_dummy(ssrc: u32, pt: PayloadType) -> Self {
         let ssrc = ssrc.to_be_bytes();
         let mut raw = vec![0; 12];
+        raw[1] = pt.into();
         raw[8] = ssrc[0];
         raw[9] = ssrc[1];
         raw[10] = ssrc[2];
@@ -45,10 +39,6 @@ pub struct Channel<R> {
     pub ssrc: u32,
     /// Codec specific delta time, generally (sample rate)/50
     pub delta_time: u32,
-    /// starting timestamp
-    pub start: u32,
-    /// How many ts have arrived
-    pub ts: usize,
     pub pkts: VecDeque<R>,
 }
 
@@ -113,13 +103,6 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
             .filter(|(_, p)| p.seq() > pkt.seq())
             .next()
             .map(|(idx, _)| idx)
-    }
-
-    fn pkt_queue_len(pkts: &VecDeque<R>) -> u16 {
-        match (pkts.front(), pkts.back()) {
-            (Some(first), Some(last)) => last.seq().wrapping_sub(first.seq()),
-            _ => pkts.len() as u16,
-        }
     }
 
     fn need_align(&self) -> bool {
@@ -205,7 +188,7 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
     }
 
     pub fn get_all_pkts(&mut self, queue: &mut VecDeque<R>) {
-        for mut chl in self.chls.iter_mut() {
+        for chl in self.chls.iter_mut() {
             for pkt in chl.pkts.drain(..) {
                 queue.push_back(pkt);
             }
@@ -216,19 +199,21 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
 pub fn insert_silence_dummy_pkt<I: Iterator<Item = SimpleRtpPacket>>(
     pkts: I,
     cache: &mut VecDeque<SimpleRtpPacket>,
+    pt: PayloadType,
     delta_time: u32,
 ) {
     let mut last_ts = None;
     for pkt in pkts {
         if let Some(ts) = last_ts {
-            let loss = pkt.ts().wrapping_sub(ts) / delta_time;
+            let loss = (pkt.ts().wrapping_sub(ts) / delta_time).wrapping_sub(1);
             if loss != 0 {
-                for _ in 0..loss {
-                    let dummy = SimpleRtpPacket::new_ssrc_dummy(pkt.ssrc());
+                for _ in 0..loss + 1 {
+                    let dummy = SimpleRtpPacket::new_dummy(pkt.ssrc(), pt);
                     cache.push_back(dummy);
                 }
             }
         }
+        last_ts = Some(pkt.ts());
         cache.push_back(pkt);
     }
 }

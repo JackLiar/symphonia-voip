@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 binrw = "0.14"
 codec-detector = { path = "../codec-detector" }
-itertools = "0.13"
 symphonia-core = { workspace = true }
 symphonia-bundle-amr = { path = "../symphonia-bundle-amr" }
 symphonia-bundle-evs = { path = "../symphonia-bundle-evs" }
