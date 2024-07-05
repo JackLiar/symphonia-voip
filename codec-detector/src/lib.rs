@@ -166,6 +166,10 @@ impl CodecDetector {
             return;
         }
 
+        if pkt.seq() == self.last_seq(pkt) {
+            return;
+        }
+
         self.add_payload_len(pkt);
         match self.pt_pkt_stat.get_mut(&pkt.payload_type()) {
             None => {
