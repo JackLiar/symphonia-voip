@@ -58,6 +58,34 @@ impl<R: RtpPacket> Channel<R> {
         self.pkt_queue_len() > max
     }
 
+    fn find_first_greater_seq_pkt(&self, pkt: &R) -> Option<usize> {
+        self.pkts
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.seq() > pkt.seq())
+            .next()
+            .map(|(idx, _)| idx)
+    }
+
+    pub fn add_pkt(&mut self, pkt: R) {
+        if let Some(last_seq) = self.pkts.back().map(|p| p.seq()) {
+            if last_seq + 1 == pkt.seq() {
+                self.pkts.push_back(pkt);
+            } else {
+                match self.find_first_greater_seq_pkt(&pkt) {
+                    Some(gre) => {
+                        self.pkts.insert(gre, pkt);
+                    }
+                    None => {
+                        self.pkts.push_back(pkt);
+                    }
+                };
+            }
+        } else {
+            self.pkts.push_back(pkt);
+        }
+    }
+
     pub fn get_pkts(&mut self, cnt: usize) -> Option<VecDeque<R>> {
         let first_ts = match self.pkts.front() {
             None => return None,
@@ -97,14 +125,6 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
         }
     }
 
-    fn find_first_greater_seq_pkt(pkts: &[R], pkt: &R) -> Option<usize> {
-        pkts.iter()
-            .enumerate()
-            .filter(|(_, p)| p.seq() > pkt.seq())
-            .next()
-            .map(|(idx, _)| idx)
-    }
-
     fn need_align(&self) -> bool {
         if self.chls.len() == 1 {
             // if there is only one channel, no needs to align
@@ -127,25 +147,7 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
                 eprintln!("no channel {:x} found", ssrc);
             }
             Some(chl) => {
-                let pkts = &mut chl.pkts;
-                if let Some(last_seq) = pkts.back().map(|p| p.seq()) {
-                    if last_seq + 1 == pkt.seq() {
-                        pkts.push_back(pkt);
-                    } else {
-                        pkts.make_contiguous();
-                        let (first, _) = pkts.as_slices();
-                        match Self::find_first_greater_seq_pkt(first, &pkt) {
-                            Some(gre) => {
-                                pkts.insert(gre, pkt);
-                            }
-                            None => {
-                                pkts.push_back(pkt);
-                            }
-                        };
-                    }
-                } else {
-                    pkts.push_back(pkt);
-                }
+                chl.add_pkt(pkt);
             }
         };
 
