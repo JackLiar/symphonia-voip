@@ -1,11 +1,11 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::io::{Error as IOError, ErrorKind, Read, Seek, SeekFrom};
+use std::io::{Error as IOError, ErrorKind, Seek, SeekFrom};
 use std::net::Ipv4Addr;
 use std::path::Path;
 use std::str::FromStr;
 
 use binrw::{BinRead, BinResult};
-use itertools::Itertools;
+use itertools::PeekingNext;
 use symphonia_core::audio::Channels;
 use symphonia_core::codecs::{
     CodecParameters, CodecType, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW,
@@ -27,7 +27,7 @@ use symphonia_bundle_evs::dec::CODEC_TYPE_EVS;
 use symphonia_codec_g7221::CODEC_TYPE_G722_1;
 
 mod demuxer;
-use demuxer::{Channel, RtpDemuxer, SimpleRtpPacket};
+use demuxer::{insert_silence_dummy_pkt, Channel, RtpDemuxer, SimpleRtpPacket};
 
 const MAGIC: &[u8] = b"#!rtpplay1.0 ";
 
@@ -278,18 +278,19 @@ impl FormatReader for RtpdumpReader {
             let pkt = codec_detector::rtp::parse_rtp(data.as_ref()).unwrap();
             let codec = self.codecs.get(&pkt.payload_type());
             let chl = self.demuxer.chls.iter_mut().find(|c| c.ssrc == pkt.ssrc());
-            match (codec, chl) {
-                (Some(codec), Some(chl)) => chl.delta_time = codec.sample_rate / 50,
+            let (codec, delta_time) = match (codec, chl) {
+                (Some(codec), Some(chl)) => {
+                    chl.delta_time = codec.sample_rate / 50;
+                    (codec, chl.delta_time)
+                }
                 _ => unreachable!("this should never happens"),
-            }
+            };
 
             let need_align = self.demuxer.add_pkt(SimpleRtpPacket::from(&pkt));
             if let Some(pkts) = self.demuxer.get_pkts(need_align) {
                 for (ssrc, pkts) in pkts {
                     let a = pkts.iter().map(|p| (p.seq(), p.ts())).collect::<Vec<_>>();
-                    for pkt in pkts {
-                        self.cache.push_back(pkt);
-                    }
+                    insert_silence_dummy_pkt(pkts.into_iter(), &mut self.cache, delta_time);
                 }
                 break;
             }
