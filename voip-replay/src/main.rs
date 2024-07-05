@@ -17,6 +17,7 @@ use std::io::Write;
 use std::path::Path;
 
 use lazy_static::lazy_static;
+use symphonia::core::audio::{AsAudioBufferRef, AudioBuffer, Channels, Signal, SignalSpec};
 use symphonia::core::codecs::{CodecRegistry, DecoderOptions, FinalizeResult, CODEC_TYPE_NULL};
 use symphonia::core::errors::{Error, Result};
 use symphonia::core::formats::{Cue, FormatOptions, FormatReader, SeekMode, SeekTo, Track};
@@ -106,16 +107,16 @@ fn main() {
 
     let mut registry = CodecRegistry::new();
     register_enabled_codecs(&mut registry);
-    registry.register_all::<symphonia_bundle_evs::dec::Decoder>();
     registry.register_all::<symphonia_bundle_amr::AmrDecoder>();
     registry.register_all::<symphonia_bundle_amr::AmrwbDecoder>();
+    registry.register_all::<symphonia_bundle_evs::dec::Decoder>();
     registry.register_all::<symphonia_codec_g7221::Decoder>();
 
     let mut probe = Probe::default();
     register_enabled_formats(&mut probe);
-    probe.register_all::<symphonia_bundle_evs::format::EvsReader>();
     probe.register_all::<symphonia_bundle_amr::AmrReader>();
     probe.register_all::<symphonia_bundle_amr::AmrwbReader>();
+    probe.register_all::<symphonia_bundle_evs::format::EvsReader>();
     probe.register_all::<symphonia_format_rtpdump::RtpdumpReader>();
 
     // For any error, return an exit code -1. Otherwise return the exit code provided.
@@ -394,6 +395,7 @@ fn play_track(
     let mut decoder = registry.make(&track.codec_params, decode_opts)?;
 
     // Get the selected track's timebase and duration.
+    let sr = track.codec_params.sample_rate.unwrap() as u64;
     let tb = track.codec_params.time_base;
     let dur = track
         .codec_params
@@ -422,9 +424,25 @@ fn play_track(
             }
         }
 
+        let mut buf =
+            AudioBuffer::<u8>::new(sr / 50, SignalSpec::new(sr as u32, Channels::FRONT_CENTRE));
+        let decoded = if packet.buf().is_empty() {
+            // handle dummy rtp packet
+            buf.render_silence(Some(sr as usize / 50));
+            Ok(buf.as_audio_buffer_ref())
+        } else {
+            decoder.decode(&packet)
+        };
+
         // Decode the packet into audio samples.
-        match decoder.decode(&packet) {
+        match decoded {
             Ok(decoded) => {
+                // let duration = decoded.capacity() as u64;
+                // let spec = *decoded.spec();
+                // let mut samples = SampleBuffer::<u8>::new(duration, spec);
+                // samples.copy_interleaved_ref(decoded.clone());
+                // println!("decoded len: {:x?}", samples.samples());
+
                 // If the audio output is not open, try to open it.
                 if audio_output.is_none() {
                     // Get the audio buffer specification. This is a description of the decoded
