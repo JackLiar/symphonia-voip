@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 use binrw::{BinRead, BinResult};
 use itertools::PeekingNext;
+use rtp::parse_rtp_payload;
 use symphonia_core::audio::Channels;
 use symphonia_core::codecs::{
     CodecParameters, CodecType, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW,
@@ -27,6 +28,7 @@ use symphonia_bundle_evs::dec::CODEC_TYPE_EVS;
 use symphonia_codec_g7221::CODEC_TYPE_G722_1;
 
 mod demuxer;
+mod rtp;
 use demuxer::{insert_silence_dummy_pkt, Channel, RtpDemuxer, SimpleRtpPacket};
 
 const MAGIC: &[u8] = b"#!rtpplay1.0 ";
@@ -151,6 +153,7 @@ fn codec_to_param(codec: &Codec) -> Option<CodecParameters> {
         "pcmu" => CODEC_TYPE_PCM_MULAW,
         _ => return None,
     };
+
     Some(params)
 }
 
@@ -348,11 +351,13 @@ impl RtpdumpReader {
             .map(|(_, ts)| ts)
             .unwrap();
 
+        let data = parse_rtp_payload(codec, &pkt)?;
+
         let pkt = Packet::new_from_slice(
             pkt.ssrc(),
             *ts * (codec.sample_rate as u64) / 50,
             (codec.sample_rate / 50) as u64,
-            &pkt.payload(),
+            &data,
         );
         *ts += 1;
         return Ok(pkt);
