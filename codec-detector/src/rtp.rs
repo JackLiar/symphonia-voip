@@ -83,40 +83,48 @@ pub enum PayloadType {
 }
 
 impl PayloadType {
-    pub fn to_u8(self) -> u8 {
-        match self {
-            Self::PCMU => 0,
-            Self::CELP => 1,
-            Self::G721 => 2,
-            Self::GSM => 3,
-            Self::G723 => 4,
-            Self::DVI4_8000 => 5,
-            Self::DVI4_16000 => 6,
-            Self::LPC => 7,
-            Self::PCMA => 8,
-            Self::G722 => 9,
-            Self::L16_44100_2 => 10,
-            Self::L16_44100_1 => 11,
-            Self::QCELP => 12,
-            Self::CN => 13,
-            Self::MPA => 14,
-            Self::G728 => 15,
-            Self::DVI4_11025 => 16,
-            Self::DVI4_22050 => 17,
-            Self::G729 => 18,
-            Self::CELB => 25,
-            Self::JPEG => 26,
-            Self::NV => 28,
-            Self::H261 => 31,
-            Self::MPV => 32,
-            Self::MP2T => 33,
-            Self::H263 => 34,
-            Self::Reserved(t) | Self::Dynamic(t) | Self::Unassigned(t) => t,
+    pub fn is_dynamic(self) -> bool {
+        matches!(self, Self::Dynamic(_))
+    }
+}
+
+impl From<PayloadType> for u8 {
+    fn from(val: PayloadType) -> Self {
+        match val {
+            PayloadType::PCMU => 0,
+            PayloadType::CELP => 1,
+            PayloadType::G721 => 2,
+            PayloadType::GSM => 3,
+            PayloadType::G723 => 4,
+            PayloadType::DVI4_8000 => 5,
+            PayloadType::DVI4_16000 => 6,
+            PayloadType::LPC => 7,
+            PayloadType::PCMA => 8,
+            PayloadType::G722 => 9,
+            PayloadType::L16_44100_2 => 10,
+            PayloadType::L16_44100_1 => 11,
+            PayloadType::QCELP => 12,
+            PayloadType::CN => 13,
+            PayloadType::MPA => 14,
+            PayloadType::G728 => 15,
+            PayloadType::DVI4_11025 => 16,
+            PayloadType::DVI4_22050 => 17,
+            PayloadType::G729 => 18,
+            PayloadType::CELB => 25,
+            PayloadType::JPEG => 26,
+            PayloadType::NV => 28,
+            PayloadType::H261 => 31,
+            PayloadType::MPV => 32,
+            PayloadType::MP2T => 33,
+            PayloadType::H263 => 34,
+            PayloadType::Reserved(t) | PayloadType::Dynamic(t) | PayloadType::Unassigned(t) => t,
         }
     }
+}
 
-    pub fn from_u8(t: u8) -> Self {
-        match t & 0x7f {
+impl From<u8> for PayloadType {
+    fn from(value: u8) -> Self {
+        match value & 0x7f {
             0 => Self::PCMU,
             3 => Self::GSM,
             4 => Self::G723,
@@ -146,10 +154,6 @@ impl PayloadType {
             t if (96..=127).contains(&t) => Self::Dynamic(t),
             t => Self::Unassigned(t),
         }
-    }
-
-    pub fn is_dynamic(self) -> bool {
-        matches!(self, Self::Dynamic(_))
     }
 }
 
@@ -228,7 +232,7 @@ pub trait RtpPacket {
     }
 
     fn payload_type(&self) -> PayloadType {
-        PayloadType::from_u8(self.raw()[1])
+        PayloadType::from(self.raw()[1])
     }
 
     fn seq(&self) -> u16 {
