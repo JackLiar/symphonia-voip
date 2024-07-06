@@ -244,6 +244,7 @@ fn decode_only(
     // TODO: Allow track selection.
     let track = reader.default_track().unwrap();
     let track_id = track.id;
+    let sr = track.codec_params.sample_rate.unwrap() as u64;
 
     // Create a decoder for the track.
     let mut decoder = registry.make(&track.codec_params, decode_opts)?;
@@ -260,8 +261,18 @@ fn decode_only(
             continue;
         }
 
+        let mut buf =
+            AudioBuffer::<u8>::new(sr / 50, SignalSpec::new(sr as u32, Channels::FRONT_CENTRE));
+        let decoded = if packet.buf().is_empty() {
+            // handle dummy rtp packet
+            buf.render_silence(Some(sr as usize / 50));
+            Ok(buf.as_audio_buffer_ref())
+        } else {
+            decoder.decode(&packet)
+        };
+
         // Decode the packet into audio samples.
-        match decoder.decode(&packet) {
+        match decoded {
             Ok(_decoded) => continue,
             Err(Error::DecodeError(err)) => warn!("decode error: {}", err),
             Err(err) => break Err(err),
