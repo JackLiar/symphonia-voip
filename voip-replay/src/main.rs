@@ -14,8 +14,9 @@
 
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use decode_only::decode_only_output;
 use lazy_static::lazy_static;
 use symphonia::core::audio::{AsAudioBufferRef, AudioBuffer, Channels, Signal, SignalSpec};
 use symphonia::core::codecs::{CodecRegistry, DecoderOptions, FinalizeResult, CODEC_TYPE_NULL};
@@ -26,10 +27,11 @@ use symphonia::core::meta::{ColorMode, MetadataOptions, MetadataRevision, Tag, V
 use symphonia::core::probe::{Hint, Probe, ProbeResult};
 use symphonia::core::units::{Time, TimeBase};
 
-use clap::{Arg, ArgAction, ArgMatches};
+use clap::{value_parser, Arg, ArgAction, ArgMatches};
 use log::{error, info, warn};
 use symphonia::default::{register_enabled_codecs, register_enabled_formats};
 
+mod decode_only;
 mod output;
 
 #[cfg(not(target_os = "linux"))]
@@ -96,6 +98,15 @@ fn main() {
                 .long("no-gapless")
                 .action(ArgAction::SetTrue)
                 .help("Disable gapless decoding and playback"),
+        )
+        .arg(
+            Arg::new("output-dir")
+                .long("output-dir")
+                .short('o')
+                .value_parser(value_parser!(PathBuf))
+                .help("decode and write raw pcm to files")
+                .requires("decode-only")
+                .num_args(1),
         )
         .arg(
             Arg::new("INPUT")
@@ -167,7 +178,7 @@ fn run(args: &ArgMatches, registry: CodecRegistry, probe: Probe) -> Result<i32> 
     let metadata_opts: MetadataOptions = Default::default();
 
     // Get the value of the track option, if provided.
-    let track = match args.get_one::<&str>("track") {
+    let track = match args.get_one::<String>("track") {
         Some(track_str) => track_str.parse::<usize>().ok(),
         _ => None,
     };
@@ -188,15 +199,27 @@ fn run(args: &ArgMatches, registry: CodecRegistry, probe: Probe) -> Result<i32> 
                     },
                 )
             } else if args.get_flag("decode-only") {
-                // Decode-only mode decodes the audio, but does not play or verify it.
-                decode_only(
-                    &registry,
-                    probed.format,
-                    &DecoderOptions {
-                        verify: false,
-                        ..Default::default()
-                    },
-                )
+                if args.get_one::<PathBuf>("output-dir").is_some() {
+                    decode_only_output(
+                        args,
+                        &registry,
+                        probed.format,
+                        &DecoderOptions {
+                            verify: false,
+                            ..Default::default()
+                        },
+                    )
+                } else {
+                    // Decode-only mode decodes the audio, but does not play or verify it.
+                    decode_only(
+                        &registry,
+                        probed.format,
+                        &DecoderOptions {
+                            verify: false,
+                            ..Default::default()
+                        },
+                    )
+                }
             } else if args.get_flag("probe-only") {
                 // Probe-only mode only prints information about the format, tracks, metadata, etc.
                 print_format(&registry, path_str, &mut probed);

@@ -12,7 +12,7 @@ use symphonia_codec_g7221::CODEC_TYPE_G722_1;
 use crate::utils::bytes_to_struct;
 
 pub fn codec_to_codec_type(codec: &Codec) -> Option<CodecType> {
-    let ct = match codec.name.as_str() {
+    let ct = match codec.name.to_lowercase().as_str() {
         "amr" => CODEC_TYPE_AMR,
         "amrwb" => CODEC_TYPE_AMRWB,
         "evs" => CODEC_TYPE_EVS,

@@ -5,7 +5,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use binrw::{BinRead, BinResult};
-use rtp::parse_rtp_payload;
+use rtp::{codec_to_codec_type, parse_rtp_payload};
 use symphonia_core::audio::Channels;
 use symphonia_core::codecs::{CodecParameters, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW};
 use symphonia_core::errors::{seek_error, Error, Result, SeekErrorKind};
@@ -142,14 +142,9 @@ fn codec_to_param(codec: &Codec) -> Option<CodecParameters> {
         params.with_max_frames_per_packet(frames);
     }
 
-    params.codec = match codec.name.as_str() {
-        "amr" => CODEC_TYPE_AMR,
-        "amrwb" => CODEC_TYPE_AMRWB,
-        "evs" => CODEC_TYPE_EVS,
-        "G.722.1" => CODEC_TYPE_G722_1,
-        "pcma" => CODEC_TYPE_PCM_ALAW,
-        "pcmu" => CODEC_TYPE_PCM_MULAW,
-        _ => return None,
+    match codec_to_codec_type(codec) {
+        Some(ct) => params.codec = ct,
+        None => return None,
     };
 
     if codec.name.as_str() == "amr" || codec.name.as_str() == "amrwb" {
@@ -263,10 +258,9 @@ impl FormatReader for RtpdumpReader {
 
         r.reader.seek(SeekFrom::Start(hdr_len))?;
         let codec = result.values().collect::<Vec<_>>()[0];
-        for (ssrc, ts) in start_tss {
-            let mut param =
+        for (ssrc, _ts) in start_tss {
+            let param =
                 codec_to_param(&codec).ok_or_else(|| Error::Unsupported("Unsupported codec"))?;
-            // param.start_ts = ts as u64;
             r.tracks.push(Track::new(ssrc, param));
             r.track_ts.push((ssrc, 0));
         }
@@ -299,10 +293,9 @@ impl FormatReader for RtpdumpReader {
 
             let codec = self.codecs.get(&pkt.payload_type());
             let chl = self.demuxer.chls.iter_mut().find(|c| c.ssrc == pkt.ssrc());
-            let (_codec, delta_time) = match (codec, chl) {
+            match (codec, chl) {
                 (Some(codec), Some(chl)) => {
                     chl.delta_time = codec.sample_rate / 50;
-                    (codec, chl.delta_time)
                 }
                 _ => unreachable!("this should never happens"),
             };
