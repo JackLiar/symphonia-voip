@@ -26,6 +26,7 @@ use symphonia_codec_g7221::CODEC_TYPE_G722_1;
 
 mod demuxer;
 mod rtp;
+mod utils;
 use demuxer::{Channel, RtpDemuxer, SimpleRtpPacket};
 
 const MAGIC: &[u8] = b"#!rtpplay1.0 ";
@@ -150,6 +151,19 @@ fn codec_to_param(codec: &Codec) -> Option<CodecParameters> {
         "pcmu" => CODEC_TYPE_PCM_MULAW,
         _ => return None,
     };
+
+    if codec.name.as_str() == "amr" || codec.name.as_str() == "amrwb" {
+        use symphonia_bundle_amr::DecoderParams;
+        let mut dp = DecoderParams::default();
+        if let Some(p) = codec.params.as_ref() {
+            if p.contains("octet-align=1") {
+                dp.octet_align = true;
+            } else if p.contains("octet-align=0") {
+                dp.octet_align = false;
+            }
+        }
+        params.extra_data = Some(utils::struct_to_boxed_bytes(dp));
+    }
 
     Some(params)
 }
