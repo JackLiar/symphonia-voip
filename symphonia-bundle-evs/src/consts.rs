@@ -6,6 +6,8 @@ use evs_codec_sys::{
 };
 use evs_codec_sys::{MODE1, MODE2};
 
+pub const MAX_BIT_RATE: u64 = 128000;
+
 const fn bitrate_to_payload_len(br: u32) -> usize {
     ((br as usize / 50) + 7) / 8
 }

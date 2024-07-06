@@ -17,7 +17,7 @@ use evs_codec_sys::{
     Decoder_State, Word16, Word32, MIME,
 };
 
-use crate::consts::{CodecFormat, FrameMode, FrameTypeIndex};
+use crate::consts::{CodecFormat, FrameMode, FrameTypeIndex, MAX_BIT_RATE};
 use crate::utils::u8_slice_to_any;
 use crate::{AmrToc, EvsToc};
 
@@ -28,7 +28,6 @@ pub const CODEC_TYPE_EVS: CodecType = decl_codec_type(b"evs");
 pub struct DecoderParams {
     pub format: CodecFormat,
     pub channel: NonZeroUsize,
-    pub sample_rate: Option<u32>,
     pub is_dtx_enabled: bool,
 }
 
@@ -38,7 +37,6 @@ impl Default for DecoderParams {
             format: Default::default(),
             channel: unsafe { NonZeroUsize::new_unchecked(1) },
             is_dtx_enabled: false,
-            sample_rate: None,
         }
     }
 }
@@ -60,7 +58,7 @@ impl Default for Decoder {
             params: CodecParameters::default(),
             raw: Decoder_State::default(),
             decoded_len: 0,
-            output: [0.0; 128000 / 50],
+            output: [0.0; MAX_BIT_RATE as usize / 50],
             decoded_data: AudioBuffer::new(960, SignalSpec::new(1, Channels::all())),
         }
     }
@@ -81,15 +79,18 @@ impl Decoder {
 
 impl D for Decoder {
     fn try_new(params: &CodecParameters, options: &DecoderOptions) -> Result<Self> {
-        let param =
-            unsafe { u8_slice_to_any::<DecoderParams>(params.extra_data.as_ref().unwrap()) };
+        let param: DecoderParams = params
+            .extra_data
+            .as_ref()
+            .map(|e| unsafe { *u8_slice_to_any(e.as_ref()) })
+            .unwrap_or_else(|| Default::default());
+        let sr = params.sample_rate.unwrap_or(16000);
         let mut decoder = Self::default();
         decoder.decode_param = param.clone();
-        decoder.decoded_data =
-            AudioBuffer::new(960, SignalSpec::new(16000, Channels::FRONT_CENTRE));
+        decoder.decoded_data = AudioBuffer::new(960, SignalSpec::new(sr, Channels::FRONT_CENTRE));
 
         decoder.raw.bitstreamformat = MIME as Word16;
-        decoder.raw.output_Fs = 16000;
+        decoder.raw.output_Fs = params.sample_rate.unwrap_or(16000) as i32;
         unsafe {
             // decoder.raw.cldfbAna = std::ptr::null_mut();
             // decoder.raw.cldfbBPF = std::ptr::null_mut();
@@ -103,7 +104,7 @@ impl D for Decoder {
 
     fn reset(&mut self) {
         self.decoded_len = self.samples_per_frame() as usize;
-        self.output = [0.0; 128000 / 50];
+        self.output = [0.0; MAX_BIT_RATE as usize / 50];
     }
 
     fn supported_codecs() -> &'static [CodecDescriptor] {
@@ -152,10 +153,7 @@ impl Decoder {
             syn_output(
                 self.output.as_mut_ptr(),
                 (self.raw.output_Fs / 50) as Word16,
-                self.decoded_data
-                    .chan_mut(packet.track_id() as _)
-                    .as_mut_ptr()
-                    .cast(),
+                self.decoded_data.chan_mut(0).as_mut_ptr().cast(),
             );
             // println!(
             //     "decoded len: {}, frames: {}, capacity: {}",

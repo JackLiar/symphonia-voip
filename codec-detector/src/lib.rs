@@ -158,11 +158,15 @@ impl CodecDetector {
             let codec = self
                 .features
                 .iter()
-                .find(|(codec, _)| codec.payload_type == Some(pkt.payload_type().to_u8()))
+                .find(|(codec, _)| codec.payload_type == Some(pkt.payload_type().into()))
                 .map(|(codec, _)| codec.clone());
             if let Some(codec) = codec {
                 self.update_codec_stat(pkt.payload_type(), &codec);
             }
+            return;
+        }
+
+        if pkt.seq() == self.last_seq(pkt) {
             return;
         }
 
