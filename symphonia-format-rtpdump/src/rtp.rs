@@ -19,12 +19,7 @@ pub fn codec_to_codec_type(codec: &Codec) -> Option<CodecType> {
     Some(ct)
 }
 
-pub fn parse_rtp_payload<R: RtpPacket>(codec: &Codec, rtp: &R) -> Result<Vec<u8>> {
-    let ct = match codec_to_codec_type(codec) {
-        None => return unsupported_error("Unsupport codec"),
-        Some(ct) => ct,
-    };
-
+pub fn parse_rtp_payload<R: RtpPacket>(ct: CodecType, rtp: &R) -> Result<Vec<u8>> {
     match ct {
         CODEC_TYPE_G722_1 | CODEC_TYPE_PCM_ALAW | CODEC_TYPE_PCM_MULAW => {
             return Ok(rtp.payload().to_vec())

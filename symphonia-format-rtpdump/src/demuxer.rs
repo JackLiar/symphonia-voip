@@ -2,6 +2,11 @@ use std::collections::VecDeque;
 
 use codec_detector::rtp::{PayloadType, RawRtpPacket, RtpPacket};
 
+pub trait DummyRtpPacket: RtpPacket {
+    fn dummy(ssrc: u32) -> Self;
+    fn dummy_ts(ssrc: u32, ts: u32) -> Self;
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct SimpleRtpPacket {
     pub raw: Vec<u8>,
@@ -13,11 +18,25 @@ impl RtpPacket for SimpleRtpPacket {
     }
 }
 
-impl SimpleRtpPacket {
-    pub fn new_dummy(ssrc: u32, pt: PayloadType) -> Self {
+impl DummyRtpPacket for SimpleRtpPacket {
+    fn dummy(ssrc: u32) -> Self {
         let ssrc = ssrc.to_be_bytes();
         let mut raw = vec![0; 12];
-        raw[1] = pt.into();
+        raw[8] = ssrc[0];
+        raw[9] = ssrc[1];
+        raw[10] = ssrc[2];
+        raw[11] = ssrc[3];
+        Self { raw }
+    }
+
+    fn dummy_ts(ssrc: u32, ts: u32) -> Self {
+        let ssrc = ssrc.to_be_bytes();
+        let ts = ts.to_be_bytes();
+        let mut raw = vec![0; 12];
+        raw[4] = ts[0];
+        raw[5] = ts[1];
+        raw[6] = ts[2];
+        raw[7] = ts[3];
         raw[8] = ssrc[0];
         raw[9] = ssrc[1];
         raw[10] = ssrc[2];
@@ -40,22 +59,23 @@ pub struct Channel<R> {
     /// Codec specific delta time, generally (sample rate)/50
     pub delta_time: u32,
     pub pkts: VecDeque<R>,
+    pub last_ts: Option<u32>,
+}
+
+fn pkt_queue_len<R: RtpPacket>(queue: &VecDeque<R>, delta_time: u32) -> usize {
+    match (queue.front(), queue.back()) {
+        (Some(first), Some(last)) => {
+            // println!("first: {}, lst: {}", first.ts(), last.ts());
+            (last.ts().wrapping_sub(first.ts()) / delta_time) as usize + 1
+        }
+        _ => 0,
+    }
 }
 
 impl<R: RtpPacket> Channel<R> {
-    pub fn pkt_queue_len(&self) -> usize {
-        match (self.pkts.front(), self.pkts.back()) {
-            (Some(first), Some(last)) => {
-                // println!("first: {}, lst: {}", first.ts(), last.ts());
-                (last.ts().wrapping_sub(first.ts()) / self.delta_time) as usize + 1
-            }
-            _ => 0,
-        }
-    }
-
     pub fn is_queue_full(&self, max: usize) -> bool {
         // println!("ssrc: {:X}, queue len: {}", self.ssrc, self.pkt_queue_len());
-        self.pkt_queue_len() > max
+        pkt_queue_len(&self.pkts, self.delta_time) > max
     }
 
     fn find_first_greater_seq_pkt(&self, pkt: &R) -> Option<usize> {
@@ -160,6 +180,16 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
             .any(|chl| chl.is_queue_full(self.sort_uniq_queue_size))
     }
 
+    pub fn get_all_pkts(&mut self, queue: &mut VecDeque<R>) {
+        for chl in self.chls.iter_mut() {
+            for pkt in chl.pkts.drain(..) {
+                queue.push_back(pkt);
+            }
+        }
+    }
+}
+
+impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
     pub fn get_pkts(&mut self, need_align: bool) -> Option<Vec<(u32, VecDeque<R>)>> {
         if need_align && !self.aligned {
             let mut result = vec![];
@@ -181,42 +211,84 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
         let mut result = vec![];
 
         for chl in &mut self.chls {
-            if let Some(pkts) = chl.get_pkts(50) {
-                result.push((chl.ssrc, pkts));
+            let mut pkts = VecDeque::with_capacity(50);
+            // let mut last_ts = None;
+            loop {
+                if pkts.len() >= 50 {
+                    break;
+                }
+
+                match (chl.pkts.pop_front(), chl.last_ts) {
+                    (None, None) => {
+                        // not enough pkts, insert 50 dummy pkts
+                        // should only happends on the first iteration
+                        for _ in 0..50 {
+                            pkts.push_back(R::dummy(chl.ssrc));
+                        }
+                        break;
+                    }
+                    (Some(pkt), None) => {
+                        chl.last_ts = Some(pkt.ts());
+                        pkts.push_back(pkt);
+                    }
+                    (Some(pkt), Some(ts)) => {
+                        // gap always >= 1
+                        let gap = pkt.ts().wrapping_sub(ts) / chl.delta_time;
+                        let overflow_cnt = (pkts.len() as u32 + gap).saturating_sub(50);
+                        if gap == 1 && overflow_cnt == 0 {
+                            // 50th pkt
+                            chl.last_ts = Some(pkt.ts());
+                            pkts.push_back(pkt);
+                        } else if gap == 1 && overflow_cnt > 0 {
+                            // 51th pkt
+                            chl.pkts.push_front(pkt);
+                            break;
+                        } else if gap > 1 && overflow_cnt == 0 {
+                            // [1st, 49th] pkt
+                            for i in 1..gap {
+                                // println!("in: {}", ts.wrapping_add((i + 1) * chl.delta_time));
+                                pkts.push_back(R::dummy_ts(
+                                    chl.ssrc,
+                                    ts.wrapping_add(i * chl.delta_time),
+                                ));
+                            }
+                            chl.last_ts = Some(pkt.ts());
+                            pkts.push_back(pkt);
+                        } else if gap > 1 && overflow_cnt > 0 {
+                            // [52th, ) pkt
+                            let cnt = (50 - pkts.len()) as u32;
+                            for i in 0..cnt {
+                                // println!("out: {}", ts.wrapping_add((i + 1) * chl.delta_time));
+                                pkts.push_back(R::dummy_ts(
+                                    chl.ssrc,
+                                    ts.wrapping_add((i + 1) * chl.delta_time),
+                                ));
+                            }
+                            chl.last_ts = Some(ts.wrapping_add(cnt * chl.delta_time));
+                            // println!("ts: {:?}", chl.last_ts);
+                            // println!("overflow {} {} {} {}", pkts.len(), gap, pkt.ts(), ts);
+                            chl.pkts.push_front(pkt);
+                            break;
+                        }
+                    }
+                    (None, Some(ts)) => {
+                        // no more pkts to dequeue, fill to 50
+                        let cnt = 50usize.wrapping_sub(pkts.len()) as u32;
+                        for i in 0..cnt {
+                            pkts.push_back(R::dummy_ts(
+                                chl.ssrc,
+                                ts.wrapping_add((i + 1) * chl.delta_time),
+                            ));
+                        }
+                        chl.last_ts = Some(ts.wrapping_add((cnt) * chl.delta_time));
+                    }
+                }
             }
+            result.push((chl.ssrc, pkts));
+            // println!("last ts: {:?}", chl.last_ts);
         }
 
         Some(result)
-    }
-
-    pub fn get_all_pkts(&mut self, queue: &mut VecDeque<R>) {
-        for chl in self.chls.iter_mut() {
-            for pkt in chl.pkts.drain(..) {
-                queue.push_back(pkt);
-            }
-        }
-    }
-}
-
-pub fn insert_silence_dummy_pkt<I: Iterator<Item = SimpleRtpPacket>>(
-    pkts: I,
-    cache: &mut VecDeque<SimpleRtpPacket>,
-    pt: PayloadType,
-    delta_time: u32,
-) {
-    let mut last_ts = None;
-    for pkt in pkts {
-        if let Some(ts) = last_ts {
-            let loss = (pkt.ts().wrapping_sub(ts) / delta_time).wrapping_sub(1);
-            if loss != 0 {
-                for _ in 0..loss + 1 {
-                    let dummy = SimpleRtpPacket::new_dummy(pkt.ssrc(), pt);
-                    cache.push_back(dummy);
-                }
-            }
-        }
-        last_ts = Some(pkt.ts());
-        cache.push_back(pkt);
     }
 }
 

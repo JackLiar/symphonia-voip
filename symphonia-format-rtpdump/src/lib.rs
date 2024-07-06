@@ -26,7 +26,7 @@ use symphonia_codec_g7221::CODEC_TYPE_G722_1;
 
 mod demuxer;
 mod rtp;
-use demuxer::{insert_silence_dummy_pkt, Channel, RtpDemuxer, SimpleRtpPacket};
+use demuxer::{Channel, RtpDemuxer, SimpleRtpPacket};
 
 const MAGIC: &[u8] = b"#!rtpplay1.0 ";
 
@@ -194,7 +194,7 @@ impl FormatReader for RtpdumpReader {
         };
         let hdr_len = source.pos();
 
-        let mut ssrcs = HashSet::new();
+        let mut start_tss = HashMap::new();
         let mut detector = CodecDetector::new();
         detector
             .get_features_from_yaml(Path::new("codec.yaml"))
@@ -212,7 +212,9 @@ impl FormatReader for RtpdumpReader {
                 Err(e) => return Err(e),
             };
             let pkt = RawRtpPacket::new(pkt.as_ref());
-            ssrcs.insert(pkt.ssrc());
+            if start_tss.get(&pkt.ssrc()).is_none() {
+                start_tss.insert(pkt.ssrc(), pkt.ts());
+            }
             detector.on_pkt(&pkt);
         }
 
@@ -225,9 +227,9 @@ impl FormatReader for RtpdumpReader {
             todo!("Support multi codec/change codec")
         }
 
-        let chls = ssrcs
+        let chls = start_tss
             .iter()
-            .map(|ssrc| Channel {
+            .map(|(ssrc, _)| Channel {
                 ssrc: *ssrc,
                 ..Default::default()
             })
@@ -247,9 +249,10 @@ impl FormatReader for RtpdumpReader {
 
         r.reader.seek(SeekFrom::Start(hdr_len))?;
         let codec = result.values().collect::<Vec<_>>()[0];
-        for ssrc in ssrcs {
-            let param =
+        for (ssrc, ts) in start_tss {
+            let mut param =
                 codec_to_param(&codec).ok_or_else(|| Error::Unsupported("Unsupported codec"))?;
+            param.start_ts = ts as u64;
             r.tracks.push(Track::new(ssrc, param));
             r.track_ts.push((ssrc, 0));
         }
@@ -257,7 +260,6 @@ impl FormatReader for RtpdumpReader {
     }
 
     fn next_packet(&mut self) -> Result<Packet> {
-        // println!("cache len: {}", self.cache.len());
         if !self.cache.is_empty() {
             let pkt = self.get_pkt_from_cache()?;
             return self.rtp_pkt_to_symphonia_pkt(pkt);
@@ -272,12 +274,15 @@ impl FormatReader for RtpdumpReader {
                         let pkt = self.get_pkt_from_cache()?;
                         return self.rtp_pkt_to_symphonia_pkt(pkt);
                     } else {
+                        // println!("total pkt cnt: {}", self.pkt_cnt);
                         return Err(e);
                     }
                 }
             };
 
             let pkt = codec_detector::rtp::parse_rtp(data.as_ref()).unwrap();
+            let need_align = self.demuxer.add_pkt(SimpleRtpPacket::from(&pkt));
+
             let codec = self.codecs.get(&pkt.payload_type());
             let chl = self.demuxer.chls.iter_mut().find(|c| c.ssrc == pkt.ssrc());
             let (_codec, delta_time) = match (codec, chl) {
@@ -288,11 +293,9 @@ impl FormatReader for RtpdumpReader {
                 _ => unreachable!("this should never happens"),
             };
 
-            let need_align = self.demuxer.add_pkt(SimpleRtpPacket::from(&pkt));
             if let Some(pkts) = self.demuxer.get_pkts(need_align) {
                 for (_ssrc, pkts) in pkts {
-                    let pt = (&pkts[0]).payload_type();
-                    insert_silence_dummy_pkt(pkts.into_iter(), &mut self.cache, pt, delta_time);
+                    self.cache.extend(pkts);
                 }
                 break;
             }
@@ -339,7 +342,8 @@ impl RtpdumpReader {
     }
 
     fn rtp_pkt_to_symphonia_pkt(&mut self, pkt: SimpleRtpPacket) -> Result<Packet> {
-        let codec = self.codecs.get(&pkt.payload_type()).unwrap();
+        // println!("pkt ts: {}", pkt.ts());
+        let track = self.tracks.iter().find(|t| t.id == pkt.ssrc()).unwrap();
         let ts = self
             .track_ts
             .iter_mut()
@@ -350,13 +354,13 @@ impl RtpdumpReader {
         let data = if pkt.payload().is_empty() {
             vec![]
         } else {
-            parse_rtp_payload(codec, &pkt)?
+            parse_rtp_payload(track.codec_params.codec, &pkt)?
         };
 
         let pkt = Packet::new_from_slice(
             pkt.ssrc(),
-            *ts * (codec.sample_rate as u64) / 50,
-            ((codec.sample_rate / 50) as u64).min(data.len() as u64),
+            *ts * (track.codec_params.sample_rate.unwrap() as u64) / 50,
+            ((track.codec_params.sample_rate.unwrap() / 50) as u64).min(data.len() as u64),
             &data,
         );
         *ts += 1;
