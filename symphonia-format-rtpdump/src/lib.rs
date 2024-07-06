@@ -252,7 +252,7 @@ impl FormatReader for RtpdumpReader {
         for (ssrc, ts) in start_tss {
             let mut param =
                 codec_to_param(&codec).ok_or_else(|| Error::Unsupported("Unsupported codec"))?;
-            param.start_ts = ts as u64;
+            // param.start_ts = ts as u64;
             r.tracks.push(Track::new(ssrc, param));
             r.track_ts.push((ssrc, 0));
         }
@@ -354,7 +354,7 @@ impl RtpdumpReader {
         let data = if pkt.payload().is_empty() {
             vec![]
         } else {
-            parse_rtp_payload(track.codec_params.codec, &pkt)?
+            parse_rtp_payload(&track.codec_params, &pkt)?
         };
 
         let pkt = Packet::new_from_slice(

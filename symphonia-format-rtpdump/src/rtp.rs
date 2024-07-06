@@ -1,4 +1,6 @@
-use symphonia_core::codecs::{CodecType, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW};
+use symphonia_core::codecs::{
+    CodecParameters, CodecType, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW,
+};
 use symphonia_core::errors::{unsupported_error, Result};
 
 use codec_detector::{rtp::RtpPacket, Codec};
@@ -19,8 +21,8 @@ pub fn codec_to_codec_type(codec: &Codec) -> Option<CodecType> {
     Some(ct)
 }
 
-pub fn parse_rtp_payload<R: RtpPacket>(ct: CodecType, rtp: &R) -> Result<Vec<u8>> {
-    match ct {
+pub fn parse_rtp_payload<R: RtpPacket>(params: &CodecParameters, rtp: &R) -> Result<Vec<u8>> {
+    match params.codec {
         CODEC_TYPE_G722_1 | CODEC_TYPE_PCM_ALAW | CODEC_TYPE_PCM_MULAW => {
             return Ok(rtp.payload().to_vec())
         }
