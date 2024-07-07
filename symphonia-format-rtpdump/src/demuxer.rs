@@ -182,7 +182,7 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
             .any(|chl| chl.is_queue_full(self.sort_uniq_queue_size))
     }
 
-    pub fn all_chl_finished(self) -> bool {
+    pub fn all_chl_finished(&self) -> bool {
         self.chls.iter().all(|c| match c.last_ts {
             None => false,
             Some(ts) => ts >= c.end,
