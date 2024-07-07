@@ -4,8 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1"
 binrw = "0.14"
-codec-detector = { path = "../codec-detector" }
+combine = "4"
+fraction = "0.15"
+indexmap = "2"
+num-derive = { workspace = true }
+num-traits = { workspace = true }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_yaml = "0.9"
 symphonia-core = { workspace = true }
 symphonia-bundle-amr = { path = "../symphonia-bundle-amr" }
 symphonia-bundle-evs = { path = "../symphonia-bundle-evs" }

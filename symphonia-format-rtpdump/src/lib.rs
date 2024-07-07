@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::io::{Error as IOError, ErrorKind, Seek, SeekFrom};
 use std::net::Ipv4Addr;
 use std::path::Path;
@@ -18,16 +18,17 @@ use symphonia_core::probe::{Descriptor, Instantiate, QueryDescriptor};
 use symphonia_core::support_format;
 use symphonia_core::units::TimeBase;
 
-use codec_detector::rtp::{PayloadType, RawRtpPacket, RtpPacket};
-use codec_detector::{Codec, CodecDetector};
 use symphonia_bundle_amr::{CODEC_TYPE_AMR, CODEC_TYPE_AMRWB};
 use symphonia_bundle_evs::dec::CODEC_TYPE_EVS;
 use symphonia_codec_g7221::CODEC_TYPE_G722_1;
 
+mod codec_detector;
 mod demuxer;
 mod rtp;
 mod utils;
+use codec_detector::{Codec, CodecDetector};
 use demuxer::{Channel, RtpDemuxer, SimpleRtpPacket};
+use rtp::{parse_rtp, PayloadType, RawRtpPacket, RtpPacket};
 
 const MAGIC: &[u8] = b"#!rtpplay1.0 ";
 
@@ -288,7 +289,7 @@ impl FormatReader for RtpdumpReader {
                 }
             };
 
-            let pkt = codec_detector::rtp::parse_rtp(data.as_ref()).unwrap();
+            let pkt = parse_rtp(data.as_ref()).unwrap();
             let need_align = self.demuxer.add_pkt(SimpleRtpPacket::from(&pkt));
 
             let codec = self.codecs.get(&pkt.payload_type());

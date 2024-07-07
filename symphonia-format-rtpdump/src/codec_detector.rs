@@ -11,8 +11,7 @@ use fraction::Fraction;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-pub mod rtp;
-use rtp::{parse_rtp_event, PayloadType, RtpPacket};
+use crate::rtp::{parse_rtp_event, PayloadType, RtpPacket};
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, Hash, PartialEq)]
 #[serde(rename_all = "camelCase")]

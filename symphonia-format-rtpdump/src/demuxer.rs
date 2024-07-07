@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use codec_detector::rtp::{PayloadType, RawRtpPacket, RtpPacket};
+use crate::rtp::{PayloadType, RawRtpPacket, RtpPacket};
 
 pub trait DummyRtpPacket: RtpPacket {
     fn dummy(ssrc: u32) -> Self;
