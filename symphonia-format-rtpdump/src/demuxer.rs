@@ -245,7 +245,7 @@ impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
                     }
                     (Some(pkt), Some(ts)) => {
                         // gap always >= 1
-                        let gap = pkt.ts().wrapping_sub(ts) / chl.delta_time;
+                        let gap = pkt.ts().saturating_sub(ts) / chl.delta_time;
                         let overflow_cnt = (pkts.len() as u32 + gap).saturating_sub(50);
                         if gap == 1 && overflow_cnt == 0 {
                             // 50th pkt
