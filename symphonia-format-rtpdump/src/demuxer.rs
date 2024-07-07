@@ -89,7 +89,7 @@ impl<R: RtpPacket> Channel<R> {
 
     pub fn add_pkt(&mut self, pkt: R) {
         if let Some(last_seq) = self.pkts.back().map(|p| p.seq()) {
-            if last_seq + 1 == pkt.seq() {
+            if last_seq.wrapping_add(1) == pkt.seq() {
                 self.pkts.push_back(pkt);
             } else {
                 match self.find_first_greater_seq_pkt(&pkt) {
