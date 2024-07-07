@@ -142,10 +142,10 @@ pub struct RtpDemuxer<R: RtpPacket> {
 
 impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
     /// 100 rtp pkts is about 2 seconds
-    pub fn new(chls: Vec<Channel<R>>) -> Self {
+    pub fn new(chls: Vec<Channel<R>>, qsize: usize) -> Self {
         Self {
             chls,
-            sort_uniq_queue_size: 100,
+            sort_uniq_queue_size: qsize,
             ..Default::default()
         }
     }
@@ -326,7 +326,7 @@ mod test {
             ..Default::default()
         };
         let chls = vec![chl].into_iter().collect();
-        RtpDemuxer::<SimpleRtpPacket>::new(chls)
+        RtpDemuxer::<SimpleRtpPacket>::new(chls, 250)
     }
 
     #[test]
