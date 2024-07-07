@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "codec-detector",
     "evs-codec-sys",
     "libg7221-sys",
     "opencore-amr-sys",
