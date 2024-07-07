@@ -61,6 +61,8 @@ pub struct Channel<R> {
     pub start: u32,
     pub end: u32,
     pub pkts: VecDeque<R>,
+    pub pkt_cnt: u64,
+    /// Last delivered ts
     pub last_ts: Option<u32>,
 }
 
@@ -106,6 +108,7 @@ impl<R: RtpPacket> Channel<R> {
         } else {
             self.pkts.push_back(pkt);
         }
+        self.pkt_cnt += 1;
     }
 
     pub fn get_pkts(&mut self, cnt: usize) -> Option<VecDeque<R>> {
@@ -154,9 +157,9 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
         }
 
         // some channel just receives its first packet
-        let cond1 = self.chls.iter().any(|c| c.pkts.len() == 1);
+        let cond1 = self.chls.iter().any(|c| c.pkt_cnt == 1);
         // more than one channels have recieve packets already
-        let cond2 = self.chls.iter().filter(|c| c.pkts.is_empty()).count() > 1;
+        let cond2 = self.chls.iter().filter(|c| c.pkt_cnt > 0).count() > 1;
         return cond1 && cond2;
     }
 
