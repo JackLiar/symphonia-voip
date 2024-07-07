@@ -145,6 +145,10 @@ pub fn on_evs(r: &mut dyn Write, data: &[u8]) -> std::io::Result<()> {
     Ok(())
 }
 
+pub fn is_evs(data: &[u8]) -> bool {
+    parse_evs(data).is_ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

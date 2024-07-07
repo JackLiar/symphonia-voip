@@ -31,30 +31,36 @@
 # amrwb
 - name: amrwb
   sampleRate: 16000
+  payloadSize: 33
+  deltaTime: 320
+  params: "octet-align=0"
+- name: amrwb
+  sampleRate: 16000
   payloadSize: 62
   deltaTime: 320
 - name: amrwb
   sampleRate: 16000
   payloadSize: 61
   deltaTime: 320
+  params: "octet-align=0"
 
 # evs
-- name: evs
-  sampleRate: 8000
-  payloadSize: 33
-  deltaTime: 320
+# - name: evs
+#   sampleRate: 8000
+#   payloadSize: 33
+#   deltaTime: 160
 - name: evs
   sampleRate: 16000
   payloadSize: 33
   deltaTime: 320
-- name: evs
-  sampleRate: 24000
-  payloadSize: 33
-  deltaTime: 320
-- name: evs
-  sampleRate: 32000
-  payloadSize: 33
-  deltaTime: 320
+# - name: evs
+#   sampleRate: 24000
+#   payloadSize: 33
+#   deltaTime: 480
+# - name: evs
+#   sampleRate: 32000
+#   payloadSize: 33
+#   deltaTime: 640
 
 # speex
 - name: speex

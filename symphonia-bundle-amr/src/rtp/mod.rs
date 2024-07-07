@@ -246,3 +246,29 @@ pub fn on_amr_amrwb_be(r: &mut dyn Write, rtp: &[u8], codec: CodecType) -> Resul
 
     Ok(())
 }
+
+pub fn is_amr(data: &[u8]) -> bool {
+    if let Ok(toc_frames) = parse_amr_oa(data) {
+        if !toc_frames.is_empty() {
+            return true;
+        }
+    } else if let Ok(toc_frames) = parse_amr_be(data) {
+        if !toc_frames.is_empty() {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn is_amrwb(data: &[u8]) -> bool {
+    if let Ok(toc_frames) = parse_amrwb_oa(data) {
+        if !toc_frames.is_empty() {
+            return true;
+        }
+    } else if let Ok(toc_frames) = parse_amrwb_be(data) {
+        if !toc_frames.is_empty() {
+            return true;
+        }
+    }
+    false
+}

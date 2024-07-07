@@ -10,6 +10,8 @@ use anyhow::Result;
 use fraction::Fraction;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use symphonia_bundle_amr::rtp::is_amrwb;
+use symphonia_bundle_evs::rtp::is_evs;
 
 use crate::rtp::{parse_rtp_event, PayloadType, RtpPacket};
 
@@ -196,6 +198,27 @@ impl CodecDetector {
                     None => f.delta_time == ft.delta_time,
                 };
                 if ft_match {
+                    let cname = codec.name.as_str();
+                    let codec = if cname == "amrwb" || cname == "evs" {
+                        if is_amrwb(pkt.payload()) {
+                            self.features
+                                .iter()
+                                .find(|(c, _)| c.name.as_str() == "amrwb")
+                                .map(|(c, _)| c)
+                                .unwrap()
+                        } else if is_evs(pkt.payload()) {
+                            self.features
+                                .iter()
+                                .find(|(c, _)| c.name.as_str() == "evs")
+                                .map(|(c, _)| c)
+                                .unwrap()
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        codec
+                    };
+
                     match self.codec_stat.get_mut(&pkt.payload_type()) {
                         None => {
                             let mut stat = HashMap::new();
