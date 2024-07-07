@@ -58,6 +58,8 @@ pub struct Channel<R> {
     pub ssrc: u32,
     /// Codec specific delta time, generally (sample rate)/50
     pub delta_time: u32,
+    pub start: u32,
+    pub end: u32,
     pub pkts: VecDeque<R>,
     pub last_ts: Option<u32>,
 }
@@ -178,6 +180,13 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
         self.chls
             .iter()
             .any(|chl| chl.is_queue_full(self.sort_uniq_queue_size))
+    }
+
+    pub fn all_chl_finished(self) -> bool {
+        self.chls.iter().all(|c| match c.last_ts {
+            None => false,
+            Some(ts) => ts >= c.end,
+        })
     }
 
     pub fn get_all_pkts(&mut self, queue: &mut VecDeque<R>) {

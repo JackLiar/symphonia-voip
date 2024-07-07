@@ -5,6 +5,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use binrw::{BinRead, BinResult};
+use indexmap::IndexMap;
 use rtp::{codec_to_codec_type, parse_rtp_payload};
 use symphonia_core::audio::Channels;
 use symphonia_core::codecs::{CodecParameters, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW};
@@ -204,7 +205,7 @@ impl FormatReader for RtpdumpReader {
         };
         let hdr_len = source.pos();
 
-        let mut ssrcs = vec![];
+        let mut chls: IndexMap<u32, Channel<SimpleRtpPacket>> = Default::default();
         let mut detector = CodecDetector::new();
         detector
             .get_features_from_yaml(Path::new("codec.yaml"))
@@ -222,8 +223,24 @@ impl FormatReader for RtpdumpReader {
                 Err(e) => return Err(e),
             };
             let pkt = RawRtpPacket::new(pkt.as_ref());
-            if ssrcs.iter().all(|ssrc| *ssrc != pkt.ssrc()) {
-                ssrcs.push(pkt.ssrc());
+
+            match chls.get_mut(&pkt.ssrc()) {
+                None => {
+                    let chl = Channel {
+                        ssrc: pkt.ssrc(),
+                        start: pkt.ts(),
+                        ..Default::default()
+                    };
+                    chls.insert(pkt.ssrc(), chl);
+                }
+                Some(chl) => {
+                    chl.start = (chl.start).min(pkt.ts());
+                    if chl.end == 0 {
+                        chl.end = pkt.ts();
+                    } else {
+                        chl.end = chl.end.max(pkt.ts());
+                    }
+                }
             }
             detector.on_pkt(&pkt);
         }
@@ -237,13 +254,7 @@ impl FormatReader for RtpdumpReader {
             todo!("Support multi codec/change codec")
         }
 
-        let chls = ssrcs
-            .iter()
-            .map(|ssrc| Channel {
-                ssrc: *ssrc,
-                ..Default::default()
-            })
-            .collect();
+        let (ssrcs, chls): (Vec<u32>, Vec<Channel<SimpleRtpPacket>>) = chls.into_iter().unzip();
 
         let mut r = Self {
             demuxer: RtpDemuxer::new(chls),
@@ -275,6 +286,19 @@ impl FormatReader for RtpdumpReader {
         }
 
         loop {
+            if self.demuxer.all_chl_finished() {
+                self.demuxer.get_all_pkts(&mut self.cache);
+                if !self.cache.is_empty() {
+                    let pkt = self.get_pkt_from_cache()?;
+                    return self.rtp_pkt_to_symphonia_pkt(pkt);
+                } else {
+                    return Err(Error::IoError(IOError::new(
+                        ErrorKind::UnexpectedEof,
+                        "end of streamm",
+                    )));
+                }
+            }
+
             let data = match read_rd_pkt(&mut self.reader) {
                 Ok(data) => data,
                 Err(e) => {
