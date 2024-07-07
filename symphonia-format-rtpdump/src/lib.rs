@@ -361,7 +361,7 @@ impl RtpdumpReader {
         let data = if pkt.payload().is_empty() {
             vec![]
         } else {
-            parse_rtp_payload(&track.codec_params, &pkt)?
+            parse_rtp_payload(&track.codec_params, &pkt).unwrap_or_default()
         };
 
         let pkt = Packet::new_from_slice(
