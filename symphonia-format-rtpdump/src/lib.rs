@@ -203,7 +203,7 @@ impl FormatReader for RtpdumpReader {
         };
         let hdr_len = source.pos();
 
-        let mut start_tss = HashMap::new();
+        let mut ssrcs = vec![];
         let mut detector = CodecDetector::new();
         detector
             .get_features_from_yaml(Path::new("codec.yaml"))
@@ -221,8 +221,8 @@ impl FormatReader for RtpdumpReader {
                 Err(e) => return Err(e),
             };
             let pkt = RawRtpPacket::new(pkt.as_ref());
-            if start_tss.get(&pkt.ssrc()).is_none() {
-                start_tss.insert(pkt.ssrc(), pkt.ts());
+            if ssrcs.iter().all(|ssrc| *ssrc != pkt.ssrc()) {
+                ssrcs.push(pkt.ssrc());
             }
             detector.on_pkt(&pkt);
         }
@@ -236,9 +236,9 @@ impl FormatReader for RtpdumpReader {
             todo!("Support multi codec/change codec")
         }
 
-        let chls = start_tss
+        let chls = ssrcs
             .iter()
-            .map(|(ssrc, _)| Channel {
+            .map(|ssrc| Channel {
                 ssrc: *ssrc,
                 ..Default::default()
             })
@@ -258,7 +258,7 @@ impl FormatReader for RtpdumpReader {
 
         r.reader.seek(SeekFrom::Start(hdr_len))?;
         let codec = result.values().collect::<Vec<_>>()[0];
-        for (ssrc, _ts) in start_tss {
+        for ssrc in ssrcs {
             let param =
                 codec_to_param(&codec).ok_or_else(|| Error::Unsupported("Unsupported codec"))?;
             r.tracks.push(Track::new(ssrc, param));
