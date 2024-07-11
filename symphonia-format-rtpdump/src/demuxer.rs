@@ -60,6 +60,7 @@ pub struct Channel<R> {
     pub delta_time: u32,
     pub start: u32,
     pub end: u32,
+    pub missed: usize,
     pub pkts: VecDeque<R>,
     pub pkt_cnt: u64,
     /// Last delivered ts
@@ -78,7 +79,6 @@ fn pkt_queue_len<R: RtpPacket>(queue: &VecDeque<R>, delta_time: u32) -> usize {
 
 impl<R: RtpPacket> Channel<R> {
     pub fn is_queue_full(&self, max: usize) -> bool {
-        // println!("ssrc: {:X}, queue len: {}", self.ssrc, self.pkt_queue_len());
         pkt_queue_len(&self.pkts, self.delta_time) > max
     }
 
@@ -229,7 +229,8 @@ impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
             let mut pkts = VecDeque::with_capacity(50);
             // let mut last_ts = None;
             loop {
-                if pkts.len() >= 50 {
+                if pkts.len() >= 50 + chl.missed {
+                    chl.missed = 0;
                     break;
                 }
 
@@ -247,7 +248,6 @@ impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
                         pkts.push_back(pkt);
                     }
                     (Some(pkt), Some(ts)) => {
-                        // gap always >= 1
                         let gap = pkt.ts().saturating_sub(ts) / chl.delta_time;
                         let overflow_cnt = (pkts.len() as u32 + gap).saturating_sub(50);
                         if gap == 1 && overflow_cnt == 0 {
@@ -256,8 +256,14 @@ impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
                             pkts.push_back(pkt);
                         } else if gap == 1 && overflow_cnt > 0 {
                             // 51th pkt
-                            chl.pkts.push_front(pkt);
-                            break;
+                            if chl.missed == 0 {
+                                chl.pkts.push_front(pkt);
+                                break;
+                            } else {
+                                chl.missed -= 1;
+                                chl.last_ts = Some(pkt.ts());
+                                pkts.push_back(pkt);
+                            }
                         } else if gap > 1 && overflow_cnt == 0 {
                             // [1st, 49th] pkt
                             for i in 1..gap {
@@ -271,36 +277,40 @@ impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
                             pkts.push_back(pkt);
                         } else if gap > 1 && overflow_cnt > 0 {
                             // [52th, ) pkt
-                            let cnt = (50 - pkts.len()) as u32;
+                            let cnt = (50usize.saturating_sub(pkts.len())) as u32;
                             for i in 0..cnt {
-                                // println!("out: {}", ts.wrapping_add((i + 1) * chl.delta_time));
                                 pkts.push_back(R::dummy_ts(
                                     chl.ssrc,
                                     ts.wrapping_add((i + 1) * chl.delta_time),
                                 ));
                             }
                             chl.last_ts = Some(ts.wrapping_add(cnt * chl.delta_time));
-                            // println!("ts: {:?}", chl.last_ts);
-                            // println!("overflow {} {} {} {}", pkts.len(), gap, pkt.ts(), ts);
                             chl.pkts.push_front(pkt);
                             break;
                         }
                     }
                     (None, Some(ts)) => {
-                        // no more pkts to dequeue, fill to 50
-                        let cnt = 50usize.wrapping_sub(pkts.len()) as u32;
-                        for i in 0..cnt {
-                            pkts.push_back(R::dummy_ts(
-                                chl.ssrc,
-                                ts.wrapping_add((i + 1) * chl.delta_time),
-                            ));
+                        if chl.end <= ts {
+                            // no more pkts to dequeue, channel is out, fill dummy to 50
+                            let cnt = 50usize.wrapping_sub(pkts.len()) as u32;
+                            for i in 0..cnt {
+                                pkts.push_back(R::dummy_ts(
+                                    chl.ssrc,
+                                    ts.wrapping_add((i + 1) * chl.delta_time),
+                                ));
+                            }
+                            chl.last_ts = Some(ts.wrapping_add((cnt) * chl.delta_time));
+                            break;
+                        } else {
+                            // no more pkts to dequeue, but still in progress
+                            // record how many packets are missed in this epoch, wait for future packets
+                            chl.missed += (50usize).saturating_sub(pkts.len());
+                            break;
                         }
-                        chl.last_ts = Some(ts.wrapping_add((cnt) * chl.delta_time));
                     }
                 }
             }
             result.push((chl.ssrc, pkts));
-            // println!("last ts: {:?}", chl.last_ts);
         }
 
         Some(result)
