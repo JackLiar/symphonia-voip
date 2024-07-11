@@ -1,0 +1,9 @@
+[package]
+name = "symphonia-codec-g722"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitflags = "2"
+bytemuck = "1"
+symphonia-core = { workspace = true }
