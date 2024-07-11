@@ -142,7 +142,7 @@ pub struct RtpDemuxer<R: RtpPacket> {
 
 impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
     /// 100 rtp pkts is about 2 seconds
-    pub fn new(chls: Vec<Channel<R>>, qsize: usize) -> Self {
+    pub fn new(chls: Vec<Channel<R>>) -> Self {
         Self {
             chls,
             sort_uniq_queue_size: 250,
@@ -319,16 +319,48 @@ impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
 
 #[cfg(test)]
 mod test {
+    use rand::seq::SliceRandom;
+    use rand::thread_rng;
+
     use super::*;
 
     impl SimpleRtpPacket {
-        pub fn new_ts(ts: u32) -> Self {
+        pub fn new_seq(seq: u16) -> Self {
+            let seq = seq.to_be_bytes();
+            let mut raw = [0; 12];
+            raw[2] = seq[0];
+            raw[3] = seq[1];
+            Self { raw: raw.to_vec() }
+        }
+
+        pub fn new_seq_ts(seq: u16, ts: u32) -> Self {
+            let seq = seq.to_be_bytes();
             let ts = ts.to_be_bytes();
             let mut raw = [0; 12];
+            raw[2] = seq[0];
+            raw[3] = seq[1];
             raw[4] = ts[0];
             raw[5] = ts[1];
             raw[6] = ts[2];
             raw[7] = ts[3];
+            Self { raw: raw.to_vec() }
+        }
+
+        pub fn new_seq_ts_ssrc(seq: u16, ts: u32, ssrc: u32) -> Self {
+            let seq = seq.to_be_bytes();
+            let ts = ts.to_be_bytes();
+            let ssrc = ssrc.to_be_bytes();
+            let mut raw = [0; 12];
+            raw[2] = seq[0];
+            raw[3] = seq[1];
+            raw[4] = ts[0];
+            raw[5] = ts[1];
+            raw[6] = ts[2];
+            raw[7] = ts[3];
+            raw[8] = ssrc[0];
+            raw[9] = ssrc[1];
+            raw[10] = ssrc[2];
+            raw[11] = ssrc[3];
             Self { raw: raw.to_vec() }
         }
     }
@@ -339,79 +371,53 @@ mod test {
             ..Default::default()
         };
         let chls = vec![chl].into_iter().collect();
-        RtpDemuxer::<SimpleRtpPacket>::new(chls, 250)
-    }
-
-    #[test]
-    fn test_add_consecutive_pkt() {
-        let mut demuxer = default_single_channel_demuxer();
-        let pkt = SimpleRtpPacket::new_ts(0);
-        assert!(!demuxer.add_pkt(pkt));
-        assert_eq!(demuxer.chls.len(), 1);
-        assert_eq!(demuxer.chls[0].pkts.len(), 1);
-        assert_eq!(demuxer.chls[0].pkts[0].ts(), 0);
-
-        let pkt = SimpleRtpPacket::new_ts(1);
-        assert!(!demuxer.add_pkt(pkt));
-        assert_eq!(demuxer.chls.len(), 1);
-        assert_eq!(demuxer.chls[0].pkts.len(), 2);
-        assert_eq!(demuxer.chls[0].pkts[0].ts(), 0);
-        assert_eq!(demuxer.chls[0].pkts[1].ts(), 1);
+        RtpDemuxer::<SimpleRtpPacket>::new(chls)
     }
 
     #[test]
     fn test_add_non_consecutive_pkt() {
-        // incoming [0,2,1]
-        // incoming [0,1,2]
-        let mut demuxer = default_single_channel_demuxer();
-        let pkt = SimpleRtpPacket::new_ts(0);
-        assert!(!demuxer.add_pkt(pkt));
-        let pkt = SimpleRtpPacket::new_ts(2);
-        assert!(!demuxer.add_pkt(pkt));
+        let mut chl = Channel::default();
 
-        let pkt = SimpleRtpPacket::new_ts(1);
-        assert!(!demuxer.add_pkt(pkt));
-        assert_eq!(demuxer.chls[0].pkts.len(), 3);
-        assert_eq!(demuxer.chls[0].pkts[0].ts(), 0);
-        assert_eq!(demuxer.chls[0].pkts[1].ts(), 1);
-        assert_eq!(demuxer.chls[0].pkts[2].ts(), 2);
+        // incoming  [0,2,1]
+        // expecting [0,1,2]
+        for seq in [0, 2, 1] {
+            let pkt = SimpleRtpPacket::new_seq(seq);
+            chl.add_pkt(pkt);
+        }
+        assert_eq!(chl.pkts.len(), 3);
+        assert_eq!(chl.pkts[0].seq(), 0);
+        assert_eq!(chl.pkts[1].seq(), 1);
+        assert_eq!(chl.pkts[2].seq(), 2);
 
         // incoming  [0,1,4,2]
         // expecting [0,1,2,4]
-        let mut demuxer = default_single_channel_demuxer();
-        let pkt = SimpleRtpPacket::new_ts(0);
-        assert!(!demuxer.add_pkt(pkt));
-        let pkt = SimpleRtpPacket::new_ts(1);
-        assert!(!demuxer.add_pkt(pkt));
-        let pkt = SimpleRtpPacket::new_ts(4);
-        assert!(!demuxer.add_pkt(pkt));
-        assert_eq!(demuxer.chls[0].pkts.len(), 3);
-        assert_eq!(demuxer.chls[0].pkts[0].ts(), 0);
-        assert_eq!(demuxer.chls[0].pkts[1].ts(), 1);
-        assert_eq!(demuxer.chls[0].pkts[2].ts(), 4);
-
-        let pkt = SimpleRtpPacket::new_ts(2);
-        assert!(!demuxer.add_pkt(pkt));
-        assert_eq!(demuxer.chls[0].pkts.len(), 4);
-        assert_eq!(demuxer.chls[0].pkts[0].ts(), 0);
-        assert_eq!(demuxer.chls[0].pkts[1].ts(), 1);
-        assert_eq!(demuxer.chls[0].pkts[2].ts(), 2);
-        assert_eq!(demuxer.chls[0].pkts[3].ts(), 4);
+        let mut chl = Channel::default();
+        for seq in [0, 1, 4, 2] {
+            let pkt = SimpleRtpPacket::new_seq(seq);
+            chl.add_pkt(pkt);
+        }
+        assert_eq!(chl.pkts.len(), 4);
+        assert_eq!(chl.pkts[0].seq(), 0);
+        assert_eq!(chl.pkts[1].seq(), 1);
+        assert_eq!(chl.pkts[2].seq(), 2);
+        assert_eq!(chl.pkts[3].seq(), 4);
     }
 
     #[test]
     fn test_single_ssrc() {
         let mut demuxer = default_single_channel_demuxer();
 
-        let pkt = SimpleRtpPacket::new_ts(0);
+        let pkt = SimpleRtpPacket::new_seq_ts(0, 1);
         assert!(!demuxer.add_pkt(pkt));
 
-        for seq in 1..101 {
-            let pkt = SimpleRtpPacket::new_ts(seq);
+        let mut data = (1..251u32).into_iter().collect::<Vec<_>>();
+        data.shuffle(&mut thread_rng());
+        for i in data {
+            let pkt = SimpleRtpPacket::new_seq_ts(i as u16, i + 1);
             assert!(!demuxer.add_pkt(pkt));
         }
 
-        assert_eq!(demuxer.chls[0].pkts.len(), 101);
+        assert_eq!(demuxer.chls[0].pkts.len(), 251);
         assert!(demuxer.any_queue_full());
 
         let pkts = demuxer.get_pkts(false);
@@ -419,5 +425,64 @@ mod test {
         let pkts = pkts.unwrap();
         assert_eq!(pkts.len(), 1);
         assert_eq!(pkts[0].1.len(), 50);
+        for (ssrc, pkts) in pkts {
+            for (idx, pkt) in pkts.into_iter().enumerate() {
+                assert_eq!(pkt.ts(), idx as u32 + 1);
+            }
+        }
+    }
+
+    #[test]
+    fn test_double_ssrc() {
+        let chls = [0, 1]
+            .into_iter()
+            .map(|i| Channel {
+                ssrc: i,
+                delta_time: 1,
+                ..Default::default()
+            })
+            .collect::<Vec<_>>();
+        let mut demuxer = RtpDemuxer::<SimpleRtpPacket>::new(chls);
+
+        let mut pkts = vec![];
+        let mut data = (0..251u32).into_iter().collect::<Vec<_>>();
+        // channel 0 pkts
+        data.shuffle(&mut thread_rng());
+        for i in data.iter().copied() {
+            let pkt = SimpleRtpPacket::new_seq_ts_ssrc(i as u16, i + 1, 0);
+            pkts.push(pkt);
+        }
+
+        // channel 1 pkts
+        data.shuffle(&mut thread_rng());
+        for i in data.iter().copied() {
+            let pkt = SimpleRtpPacket::new_seq_ts_ssrc(i as u16, i + 1, 1);
+            pkts.push(pkt);
+        }
+
+        pkts.shuffle(&mut thread_rng());
+
+        for pkt in pkts {
+            demuxer.add_pkt(pkt);
+        }
+
+        assert_eq!(demuxer.chls[0].pkts.len(), 251);
+        assert!(demuxer.any_queue_full());
+        assert_eq!(demuxer.chls[1].pkts.len(), 251);
+        assert!(demuxer.any_queue_full());
+
+        let pkts = demuxer.get_pkts(false);
+        assert!(pkts.is_some());
+        let pkts = pkts.unwrap();
+        assert_eq!(pkts.len(), 2);
+
+        assert_eq!(pkts[0].1.len(), 50);
+        assert_eq!(pkts[1].1.len(), 50);
+        for (ssrc, pkts) in pkts {
+            for (idx, pkt) in pkts.into_iter().enumerate() {
+                println!("[{:#010x}] pkt ts: {}, idx: {}", ssrc, pkt.ts(), idx + 1);
+                assert_eq!(pkt.ts(), idx as u32 + 1);
+            }
+        }
     }
 }

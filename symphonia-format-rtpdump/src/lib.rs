@@ -271,7 +271,7 @@ impl FormatReader for RtpdumpReader {
         let (ssrcs, chls): (Vec<u32>, Vec<Channel<SimpleRtpPacket>>) = chls.into_iter().unzip();
 
         let mut r = Self {
-            demuxer: RtpDemuxer::new(chls, 250),
+            demuxer: RtpDemuxer::new(chls),
             reader: source,
             tracks: vec![],
             track_ts: vec![],
