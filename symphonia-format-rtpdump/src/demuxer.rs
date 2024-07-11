@@ -206,6 +206,9 @@ impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
         if need_align && !self.aligned {
             let mut result = vec![];
             for chl in &mut self.chls {
+                if let Some(last) = chl.pkts.back() {
+                    chl.last_ts = Some(last.ts());
+                }
                 let pkts = &mut chl.pkts;
                 let mut rem = pkts.split_off(pkts.len());
                 std::mem::swap(pkts, &mut rem);
