@@ -1,11 +1,12 @@
 use std::collections::{HashMap, VecDeque};
 use std::io::{Error as IOError, ErrorKind, Seek, SeekFrom};
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::Path;
 use std::str::FromStr;
 
 use binrw::{BinRead, BinResult};
 use indexmap::IndexMap;
+use log::info;
 use rtp::{codec_to_codec_type, parse_rtp_payload};
 use symphonia_core::audio::Channels;
 use symphonia_core::codecs::{CodecParameters, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW};
@@ -34,25 +35,36 @@ use rtp::{parse_rtp, PayloadType, RawRtpPacket, RtpPacket};
 const MAGIC: &[u8] = b"#!rtpplay1.0 ";
 
 #[binrw::parser(reader, endian)]
-fn parse_src_ip() -> BinResult<Ipv4Addr> {
+fn parse_src_ip() -> BinResult<IpAddr> {
     let pos = reader.stream_position()?;
-    let ip: &mut [u8] = &mut [0; 16];
-    let mut len = 0;
+    let mut ip = vec![];
 
-    for c in ip.iter_mut() {
+    loop {
         let char = &mut [0];
         reader.read_exact(char)?;
         if char[0] == b'/' {
             break;
         }
-        *c = char[0];
-        len += 1;
+        ip.push(char[0]);
     }
 
-    Ipv4Addr::from_str(&String::from_utf8_lossy(&ip[..len])).map_err(|e| binrw::Error::Custom {
-        pos,
-        err: Box::new(e),
-    })
+    if ip.contains(&b'.') {
+        let ip = Ipv4Addr::from_str(&String::from_utf8_lossy(&ip)).map_err(|e| {
+            binrw::Error::Custom {
+                pos,
+                err: Box::new(e),
+            }
+        })?;
+        Ok(IpAddr::V4(ip))
+    } else {
+        let ip = Ipv6Addr::from_str(&String::from_utf8_lossy(&ip)).map_err(|e| {
+            binrw::Error::Custom {
+                pos,
+                err: Box::new(e),
+            }
+        })?;
+        Ok(IpAddr::V6(ip))
+    }
 }
 #[binrw::parser(reader, endian)]
 fn parse_src_port() -> BinResult<u16> {
@@ -83,7 +95,7 @@ fn parse_src_port() -> BinResult<u16> {
 #[repr(C)]
 pub struct FileHeader {
     #[br(parse_with = parse_src_ip)]
-    pub ip: Ipv4Addr,
+    pub ip: IpAddr,
     #[br(parse_with = parse_src_port)]
     pub port: u16,
     pub start_sec: u32,
@@ -96,7 +108,7 @@ pub struct FileHeader {
 impl Default for FileHeader {
     fn default() -> Self {
         Self {
-            ip: Ipv4Addr::new(0, 0, 0, 0),
+            ip: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
             port: 0,
             start_sec: 0,
             start_usec: 0,
@@ -198,11 +210,12 @@ impl FormatReader for RtpdumpReader {
     where
         Self: Sized,
     {
-        let _hdr = match FileHeader::read(&mut source) {
+        let hdr = match FileHeader::read(&mut source) {
             Ok(hdr) => hdr,
             Err(binrw::Error::Io(e)) => return Err(Error::IoError(e)),
             Err(_) => return Err(Error::DecodeError("Failed to decode rtpdump header")),
         };
+        info!("rtpdump hdr: {:?}", hdr);
         let hdr_len = source.pos();
 
         let mut chls: IndexMap<u32, Channel<SimpleRtpPacket>> = Default::default();
@@ -238,10 +251,11 @@ impl FormatReader for RtpdumpReader {
                     if chl.end == 0 {
                         chl.end = pkt.ts();
                     } else {
-                        chl.end = chl.end.max(pkt.ts());
+                        chl.end = (chl.end).max(pkt.ts());
                     }
                 }
-            }
+            };
+
             detector.on_pkt(&pkt);
         }
 
@@ -292,9 +306,10 @@ impl FormatReader for RtpdumpReader {
                     let pkt = self.get_pkt_from_cache()?;
                     return self.rtp_pkt_to_symphonia_pkt(pkt);
                 } else {
+                    println!("total pkt cnt: {}", self.pkt_cnt);
                     return Err(Error::IoError(IOError::new(
                         ErrorKind::UnexpectedEof,
-                        "end of streamm",
+                        "end of stream",
                     )));
                 }
             }
@@ -307,7 +322,7 @@ impl FormatReader for RtpdumpReader {
                         let pkt = self.get_pkt_from_cache()?;
                         return self.rtp_pkt_to_symphonia_pkt(pkt);
                     } else {
-                        // println!("total pkt cnt: {}", self.pkt_cnt);
+                        println!("total pkt cnt: {}", self.pkt_cnt);
                         return Err(e);
                     }
                 }
