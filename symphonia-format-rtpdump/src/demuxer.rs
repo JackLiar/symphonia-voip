@@ -110,26 +110,94 @@ impl<R: RtpPacket> Channel<R> {
         }
         self.pkt_cnt += 1;
     }
+}
 
-    pub fn get_pkts(&mut self, cnt: usize) -> Option<VecDeque<R>> {
-        let first_ts = match self.pkts.front() {
-            None => return None,
-            Some(p) => p.ts(),
-        };
+impl<R: RtpPacket + DummyRtpPacket> Channel<R> {
+    pub fn get_pkts(&mut self, cnt: usize) -> VecDeque<R> {
+        let mut pkts = VecDeque::with_capacity(cnt);
+        loop {
+            if pkts.len() >= cnt + self.missed {
+                self.missed = 0;
+                break;
+            }
 
-        let idx = match self
-            .pkts
-            .iter()
-            .enumerate()
-            .find(|(_, p)| (p.ts().wrapping_sub(first_ts) / self.delta_time) as usize + 1 > cnt)
-        {
-            None => return Some(std::mem::replace(&mut self.pkts, Default::default())),
-            Some((idx, _)) => idx,
-        };
-
-        let mut rem = self.pkts.split_off(idx);
-        std::mem::swap(&mut self.pkts, &mut rem);
-        Some(rem)
+            match (self.pkts.pop_front(), self.last_ts) {
+                (None, None) => {
+                    // not enough pkts, insert 50 dummy pkts
+                    // should only happends on the first iteration
+                    for _ in 0..cnt {
+                        pkts.push_back(R::dummy(self.ssrc));
+                    }
+                    break;
+                }
+                (Some(pkt), None) => {
+                    self.last_ts = Some(pkt.ts());
+                    pkts.push_back(pkt);
+                }
+                (Some(pkt), Some(ts)) => {
+                    let gap = pkt.ts().saturating_sub(ts) / self.delta_time;
+                    let overflow_cnt = (pkts.len() as u32 + gap).saturating_sub(cnt as u32);
+                    if gap == 1 && overflow_cnt == 0 {
+                        // 50th pkt
+                        self.last_ts = Some(pkt.ts());
+                        pkts.push_back(pkt);
+                    } else if gap == 1 && overflow_cnt > 0 {
+                        // 51th pkt
+                        if self.missed == 0 {
+                            self.pkts.push_front(pkt);
+                            break;
+                        } else {
+                            self.missed -= 1;
+                            self.last_ts = Some(pkt.ts());
+                            pkts.push_back(pkt);
+                        }
+                    } else if gap > 1 && overflow_cnt == 0 {
+                        // [1st, 49th] pkt
+                        for i in 1..gap {
+                            // println!("in: {}", ts.wrapping_add((i + 1) * chl.delta_time));
+                            pkts.push_back(R::dummy_ts(
+                                self.ssrc,
+                                ts.wrapping_add(i * self.delta_time),
+                            ));
+                        }
+                        self.last_ts = Some(pkt.ts());
+                        pkts.push_back(pkt);
+                    } else if gap > 1 && overflow_cnt > 0 {
+                        // [52th, ) pkt
+                        let cnt = (cnt.saturating_sub(pkts.len())) as u32;
+                        for i in 0..cnt {
+                            pkts.push_back(R::dummy_ts(
+                                self.ssrc,
+                                ts.wrapping_add((i + 1) * self.delta_time),
+                            ));
+                        }
+                        self.last_ts = Some(ts.wrapping_add(cnt * self.delta_time));
+                        self.pkts.push_front(pkt);
+                        break;
+                    }
+                }
+                (None, Some(ts)) => {
+                    if self.end <= ts {
+                        // no more pkts to dequeue, channel is out, fill dummy to 50
+                        let cnt = cnt.wrapping_sub(pkts.len()) as u32;
+                        for i in 0..cnt {
+                            pkts.push_back(R::dummy_ts(
+                                self.ssrc,
+                                ts.wrapping_add((i + 1) * self.delta_time),
+                            ));
+                        }
+                        self.last_ts = Some(ts.wrapping_add((cnt) * self.delta_time));
+                        break;
+                    } else {
+                        // no more pkts to dequeue, but still in progress
+                        // record how many packets are missed in this epoch, wait for future packets
+                        self.missed += cnt.saturating_sub(pkts.len());
+                        break;
+                    }
+                }
+            }
+        }
+        pkts
     }
 }
 
@@ -226,90 +294,7 @@ impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
         let mut result = vec![];
 
         for chl in &mut self.chls {
-            let mut pkts = VecDeque::with_capacity(50);
-            // let mut last_ts = None;
-            loop {
-                if pkts.len() >= 50 + chl.missed {
-                    chl.missed = 0;
-                    break;
-                }
-
-                match (chl.pkts.pop_front(), chl.last_ts) {
-                    (None, None) => {
-                        // not enough pkts, insert 50 dummy pkts
-                        // should only happends on the first iteration
-                        for _ in 0..50 {
-                            pkts.push_back(R::dummy(chl.ssrc));
-                        }
-                        break;
-                    }
-                    (Some(pkt), None) => {
-                        chl.last_ts = Some(pkt.ts());
-                        pkts.push_back(pkt);
-                    }
-                    (Some(pkt), Some(ts)) => {
-                        let gap = pkt.ts().saturating_sub(ts) / chl.delta_time;
-                        let overflow_cnt = (pkts.len() as u32 + gap).saturating_sub(50);
-                        if gap == 1 && overflow_cnt == 0 {
-                            // 50th pkt
-                            chl.last_ts = Some(pkt.ts());
-                            pkts.push_back(pkt);
-                        } else if gap == 1 && overflow_cnt > 0 {
-                            // 51th pkt
-                            if chl.missed == 0 {
-                                chl.pkts.push_front(pkt);
-                                break;
-                            } else {
-                                chl.missed -= 1;
-                                chl.last_ts = Some(pkt.ts());
-                                pkts.push_back(pkt);
-                            }
-                        } else if gap > 1 && overflow_cnt == 0 {
-                            // [1st, 49th] pkt
-                            for i in 1..gap {
-                                // println!("in: {}", ts.wrapping_add((i + 1) * chl.delta_time));
-                                pkts.push_back(R::dummy_ts(
-                                    chl.ssrc,
-                                    ts.wrapping_add(i * chl.delta_time),
-                                ));
-                            }
-                            chl.last_ts = Some(pkt.ts());
-                            pkts.push_back(pkt);
-                        } else if gap > 1 && overflow_cnt > 0 {
-                            // [52th, ) pkt
-                            let cnt = (50usize.saturating_sub(pkts.len())) as u32;
-                            for i in 0..cnt {
-                                pkts.push_back(R::dummy_ts(
-                                    chl.ssrc,
-                                    ts.wrapping_add((i + 1) * chl.delta_time),
-                                ));
-                            }
-                            chl.last_ts = Some(ts.wrapping_add(cnt * chl.delta_time));
-                            chl.pkts.push_front(pkt);
-                            break;
-                        }
-                    }
-                    (None, Some(ts)) => {
-                        if chl.end <= ts {
-                            // no more pkts to dequeue, channel is out, fill dummy to 50
-                            let cnt = 50usize.wrapping_sub(pkts.len()) as u32;
-                            for i in 0..cnt {
-                                pkts.push_back(R::dummy_ts(
-                                    chl.ssrc,
-                                    ts.wrapping_add((i + 1) * chl.delta_time),
-                                ));
-                            }
-                            chl.last_ts = Some(ts.wrapping_add((cnt) * chl.delta_time));
-                            break;
-                        } else {
-                            // no more pkts to dequeue, but still in progress
-                            // record how many packets are missed in this epoch, wait for future packets
-                            chl.missed += (50usize).saturating_sub(pkts.len());
-                            break;
-                        }
-                    }
-                }
-            }
+            let pkts = chl.get_pkts(50);
             result.push((chl.ssrc, pkts));
         }
 
