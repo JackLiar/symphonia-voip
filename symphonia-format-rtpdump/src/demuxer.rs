@@ -145,7 +145,7 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
     pub fn new(chls: Vec<Channel<R>>, qsize: usize) -> Self {
         Self {
             chls,
-            sort_uniq_queue_size: qsize,
+            sort_uniq_queue_size: 250,
             ..Default::default()
         }
     }
