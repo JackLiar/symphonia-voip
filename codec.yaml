@@ -14,6 +14,14 @@
   payloadType: 0
   maxFramesPerPacket: 160
 
+# G.722
+- name: g.722
+  sampleRate: 16000
+  payloadSize: 160
+  deltaTime: 160
+  payloadType: 9
+  bitRate: 64000
+
 # amr
 - name: amr
   sampleRate: 8000

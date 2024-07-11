@@ -121,6 +121,7 @@ fn main() {
     registry.register_all::<symphonia_bundle_amr::AmrDecoder>();
     registry.register_all::<symphonia_bundle_amr::AmrwbDecoder>();
     registry.register_all::<symphonia_bundle_evs::dec::Decoder>();
+    registry.register_all::<symphonia_codec_g722::Decoder>();
     registry.register_all::<symphonia_codec_g7221::Decoder>();
 
     let mut probe = Probe::default();

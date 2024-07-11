@@ -17,6 +17,7 @@ serde_yaml = "0.9"
 symphonia-core = { workspace = true }
 symphonia-bundle-amr = { path = "../symphonia-bundle-amr" }
 symphonia-bundle-evs = { path = "../symphonia-bundle-evs" }
+symphonia-codec-g722 = { path = "../symphonia-codec-g722" }
 symphonia-codec-g7221 = { path = "../symphonia-codec-g7221" }
 
 [dev-dependencies]

@@ -19,6 +19,7 @@ use symphonia_core::errors::unsupported_error;
 use symphonia_bundle_amr::rtp::{on_amr_amrwb_be, on_amr_amrwb_oa};
 use symphonia_bundle_amr::{DecoderParams as AMRDecodeParams, CODEC_TYPE_AMR, CODEC_TYPE_AMRWB};
 use symphonia_bundle_evs::dec::CODEC_TYPE_EVS;
+use symphonia_codec_g722::CODEC_TYPE_G722;
 use symphonia_codec_g7221::CODEC_TYPE_G722_1;
 
 use crate::codec_detector::Codec;
@@ -29,6 +30,7 @@ pub fn codec_to_codec_type(codec: &Codec) -> Option<CodecType> {
         "amr" => CODEC_TYPE_AMR,
         "amrwb" => CODEC_TYPE_AMRWB,
         "evs" => CODEC_TYPE_EVS,
+        "g.722" => CODEC_TYPE_G722,
         "g.722.1" => CODEC_TYPE_G722_1,
         "pcma" => CODEC_TYPE_PCM_ALAW,
         "pcmu" => CODEC_TYPE_PCM_MULAW,
@@ -42,7 +44,7 @@ pub fn parse_rtp_payload<R: RtpPacket>(
     rtp: &R,
 ) -> symphonia_core::errors::Result<Vec<u8>> {
     match params.codec {
-        CODEC_TYPE_G722_1 | CODEC_TYPE_PCM_ALAW | CODEC_TYPE_PCM_MULAW => {
+        CODEC_TYPE_G722_1 | CODEC_TYPE_G722 | CODEC_TYPE_PCM_ALAW | CODEC_TYPE_PCM_MULAW => {
             return Ok(rtp.payload().to_vec())
         }
         CODEC_TYPE_AMR | CODEC_TYPE_AMRWB => {
