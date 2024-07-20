@@ -170,12 +170,12 @@ fn block4(band: &mut Band, d: i32) {
     }
 
     /* Block 4, DELAYA */
-    for i in (1..6).rev() {
+    for i in (1..7).rev() {
         band.d[i] = band.d[i - 1];
         band.b[i] = band.bp[i];
     }
 
-    for i in (1..2).rev() {
+    for i in (1..3).rev() {
         band.r[i] = band.r[i - 1];
         band.p[i] = band.p[i - 1];
         band.a[i] = band.ap[i];
@@ -190,7 +190,7 @@ fn block4(band: &mut Band, d: i32) {
 
     /* Block 4, FILTEZ */
     band.sz = 0;
-    for i in (1..6).rev() {
+    for i in (1..7).rev() {
         wd1 = saturate(band.d[i] + band.d[i]) as i32;
         band.sz += (band.b[i] * wd1) >> 15;
     }
@@ -295,7 +295,7 @@ impl G722Decoder {
 
             block4(&mut self.band[0], dlowt);
 
-            if self.options.contains(Options::SAMPLE_RATE_8000) {
+            if !self.options.contains(Options::SAMPLE_RATE_8000) {
                 /* Block 2H, INVQAH */
                 wd2 = QM2[ihigh as usize];
                 dhigh = (self.band[1].det * wd2) >> 15;
