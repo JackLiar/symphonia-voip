@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{BufWriter, Error as IoError, ErrorKind, Write};
 use std::path::PathBuf;
 
+use bytemuck::cast_slice;
 use clap::ArgMatches;
 use log::warn;
 use symphonia::core::audio::{
@@ -73,9 +74,9 @@ pub fn decode_only_output(
             Ok(decoded) => {
                 let duration = decoded.capacity() as u64;
                 let spec = *decoded.spec();
-                let mut samples = SampleBuffer::<u8>::new(duration, spec);
+                let mut samples = SampleBuffer::<i16>::new(duration, spec);
                 samples.copy_interleaved_ref(decoded);
-                pcm.write_all(samples.samples())?;
+                pcm.write_all(cast_slice::<_, u8>(samples.samples()))?;
             }
             Err(Error::DecodeError(err)) => warn!("decode error: {}", err),
             Err(err) => break Err(err),
