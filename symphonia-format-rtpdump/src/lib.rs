@@ -335,7 +335,10 @@ impl FormatReader for RtpdumpReader {
             let chl = self.demuxer.chls.iter_mut().find(|c| c.ssrc == pkt.ssrc());
             match (codec, chl) {
                 (Some(codec), Some(chl)) => {
-                    chl.delta_time = codec.sample_rate / 50;
+                    match codec.delta_time {
+                        Some(dt) => chl.delta_time = dt,
+                        None => chl.delta_time = codec.sample_rate / 50,
+                    };
                 }
                 _ => unreachable!("this should never happens"),
             };

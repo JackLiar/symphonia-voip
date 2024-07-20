@@ -26,6 +26,7 @@ pub struct Codec {
     pub params: Option<String>,
     pub max_frames_per_packet: Option<u64>,
     pub payload_type: Option<u8>,
+    pub delta_time: Option<u32>,
 }
 
 impl Codec {
@@ -38,6 +39,7 @@ impl Codec {
             params: None,
             max_frames_per_packet: None,
             payload_type: None,
+            delta_time: None,
         }
     }
 }
