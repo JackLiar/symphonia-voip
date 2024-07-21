@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate num_derive;
-
 use num_traits::FromPrimitive;
 
 mod consts;
@@ -116,15 +113,4 @@ impl EvsToc {
             }
         }
     }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_amr_toc() {}
-
-    #[test]
-    fn test_evs_toc() {}
 }

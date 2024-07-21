@@ -1,5 +1,3 @@
-use std::os::raw::c_int;
-
 use symphonia_core::audio::{
     AsAudioBufferRef, AudioBuffer, AudioBufferRef, Channels, Signal, SignalSpec,
 };
@@ -13,11 +11,11 @@ use symphonia_core::support_codec;
 
 use libg7221_sys::*;
 
-const G722_1_SAMPLE_RATE_16000: u32 = g722_1_sample_rates_t_G722_1_SAMPLE_RATE_16000;
-const G722_1_SAMPLE_RATE_32000: u32 = g722_1_sample_rates_t_G722_1_SAMPLE_RATE_32000;
-const G722_1_BIT_RATE_24000: u32 = g722_1_bit_rates_t_G722_1_BIT_RATE_24000;
-const G722_1_BIT_RATE_32000: u32 = g722_1_bit_rates_t_G722_1_BIT_RATE_32000;
-const G722_1_BIT_RATE_48000: u32 = g722_1_bit_rates_t_G722_1_BIT_RATE_48000;
+pub const G722_1_SAMPLE_RATE_16000: u32 = g722_1_sample_rates_t_G722_1_SAMPLE_RATE_16000;
+pub const G722_1_SAMPLE_RATE_32000: u32 = g722_1_sample_rates_t_G722_1_SAMPLE_RATE_32000;
+pub const G722_1_BIT_RATE_24000: u32 = g722_1_bit_rates_t_G722_1_BIT_RATE_24000;
+pub const G722_1_BIT_RATE_32000: u32 = g722_1_bit_rates_t_G722_1_BIT_RATE_32000;
+pub const G722_1_BIT_RATE_48000: u32 = g722_1_bit_rates_t_G722_1_BIT_RATE_48000;
 
 pub const CODEC_TYPE_G722_1: CodecType = decl_codec_type(b"g7221");
 
@@ -48,7 +46,7 @@ impl Decoder {
 
     pub fn decode(&mut self, data: &[u8]) {
         unsafe {
-            let sample_cnt = g722_1_decode(
+            let _sample_cnt = g722_1_decode(
                 &mut self.st,
                 self.decoded_data.chan_mut(0).as_mut_ptr(),
                 data.as_ptr().cast_mut(),

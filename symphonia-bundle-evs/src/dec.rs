@@ -8,18 +8,18 @@ use symphonia_core::codecs::{
     decl_codec_type, CodecDescriptor, CodecParameters, CodecType, Decoder as D, DecoderOptions,
     FinalizeResult,
 };
-use symphonia_core::errors::{decode_error, Error, Result};
+use symphonia_core::errors::{Error, Result};
 use symphonia_core::formats::Packet;
 use symphonia_core::support_codec;
 
 use evs_codec_sys::{
-    amr_wb_dec, evs_dec, init_decoder, read_indices_from_djb, reset_indices_dec, syn_output,
-    Decoder_State, Word16, Word32, MIME,
+    evs_dec, init_decoder, read_indices_from_djb, reset_indices_dec, syn_output, Decoder_State,
+    Word16, Word32, MIME,
 };
 
-use crate::consts::{CodecFormat, FrameMode, FrameTypeIndex, MAX_BIT_RATE};
+use crate::consts::{CodecFormat, FrameMode, MAX_BIT_RATE};
 use crate::utils::u8_slice_to_any;
-use crate::{AmrToc, EvsToc};
+use crate::EvsToc;
 
 pub const CODEC_TYPE_EVS: CodecType = decl_codec_type(b"evs");
 
