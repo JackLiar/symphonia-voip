@@ -256,7 +256,11 @@ impl FormatReader for RtpdumpReader {
         }
 
         let result = detector.get_result();
-        println!("codec detect result: {:?}", result);
+        info!("codecs:");
+        for (pt, codec) in &result {
+            let pt: u8 = (*pt).into();
+            info!("{}: {:?}", pt, codec);
+        }
         if result.is_empty() {
             return Err(Error::Unsupported("Failed to detect codec"));
         }
@@ -264,13 +268,24 @@ impl FormatReader for RtpdumpReader {
             todo!("Support multi codec/change codec")
         }
 
-        let (ssrcs, chls): (Vec<u32>, Vec<Channel<SimpleRtpPacket>>) = chls.into_iter().unzip();
+        let chls: Vec<Channel<SimpleRtpPacket>> = chls.into_values().collect();
+        let codec = result.values().collect::<Vec<_>>()[0];
+        let mut tracks = vec![];
+        let mut track_ts = vec![];
+        for chl in &chls {
+            let mut param =
+                codec_to_param(&codec).ok_or_else(|| Error::Unsupported("Unsupported codec"))?;
+            param.with_n_frames((chl.end.saturating_sub(chl.start)) as u64);
+            let track = Track::new(chl.ssrc, param);
+            tracks.push(track);
+            track_ts.push((chl.ssrc, 0));
+        }
 
         let mut r = Self {
             demuxer: RtpDemuxer::new(chls),
             reader: source,
-            tracks: vec![],
-            track_ts: vec![],
+            tracks,
+            track_ts,
             cues: vec![],
             metadata: Default::default(),
             codecs: result.clone(),
@@ -279,13 +294,7 @@ impl FormatReader for RtpdumpReader {
         };
 
         r.reader.seek(SeekFrom::Start(hdr_len))?;
-        let codec = result.values().collect::<Vec<_>>()[0];
-        for ssrc in ssrcs {
-            let param =
-                codec_to_param(&codec).ok_or_else(|| Error::Unsupported("Unsupported codec"))?;
-            r.tracks.push(Track::new(ssrc, param));
-            r.track_ts.push((ssrc, 0));
-        }
+
         Ok(r)
     }
 

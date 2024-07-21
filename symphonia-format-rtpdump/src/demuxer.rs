@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::rtp::{PayloadType, RawRtpPacket, RtpPacket};
+use crate::rtp::{RawRtpPacket, RtpPacket};
 
 pub trait DummyRtpPacket: RtpPacket {
     fn dummy(ssrc: u32) -> Self;
@@ -410,7 +410,7 @@ mod test {
         let pkts = pkts.unwrap();
         assert_eq!(pkts.len(), 1);
         assert_eq!(pkts[0].1.len(), 50);
-        for (ssrc, pkts) in pkts {
+        for (_ssrc, pkts) in pkts {
             for (idx, pkt) in pkts.into_iter().enumerate() {
                 assert_eq!(pkt.ts(), idx as u32 + 1);
             }
