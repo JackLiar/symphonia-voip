@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use log::info;
 use rtp::{codec_to_codec_type, parse_rtp_payload};
 use symphonia_core::audio::Channels;
-use symphonia_core::codecs::{CodecParameters, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW};
+use symphonia_core::codecs::CodecParameters;
 use symphonia_core::errors::{seek_error, Error, Result, SeekErrorKind};
 use symphonia_core::formats::{
     Cue, FormatOptions, FormatReader, Packet, SeekMode, SeekTo, SeekedTo, Track,
@@ -19,10 +19,6 @@ use symphonia_core::meta::{Metadata, MetadataLog};
 use symphonia_core::probe::{Descriptor, Instantiate, QueryDescriptor};
 use symphonia_core::support_format;
 use symphonia_core::units::TimeBase;
-
-use symphonia_bundle_amr::{CODEC_TYPE_AMR, CODEC_TYPE_AMRWB};
-use symphonia_bundle_evs::dec::CODEC_TYPE_EVS;
-use symphonia_codec_g7221::CODEC_TYPE_G722_1;
 
 mod codec_detector;
 mod demuxer;
@@ -415,15 +411,5 @@ impl RtpdumpReader {
         );
         *ts += 1;
         return Ok(pkt);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn read_rtpdump_header() {
-        let header = b"#!rtpplay1.0 192.168.1.1/12345";
     }
 }
