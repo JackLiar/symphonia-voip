@@ -1,5 +1,11 @@
-#[cfg(feature = "gen")]
-include!(concat!(env!("OUT_DIR"), "/opencore_amr_sys.rs"));
+#[allow(clippy::all)]
+#[allow(warnings)]
+mod bindings {
+    #[cfg(feature = "gen")]
+    include!(concat!(env!("OUT_DIR"), "/opencore_amr_sys.rs"));
 
-#[cfg(all(not(feature = "gen"), target_os = "macos", target_arch = "aarch64"))]
-include!("macos_aarch64.rs");
+    #[cfg(all(not(feature = "gen"), target_os = "macos", target_arch = "aarch64"))]
+    include!("macos_aarch64.rs");
+}
+
+pub use bindings::*;
