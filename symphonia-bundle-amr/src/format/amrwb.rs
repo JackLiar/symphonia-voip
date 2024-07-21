@@ -85,7 +85,7 @@ impl QueryDescriptor for AmrwbReader {
         )]
     }
 
-    fn score(context: &[u8]) -> u8 {
+    fn score(_context: &[u8]) -> u8 {
         255
     }
 }
@@ -158,7 +158,7 @@ impl FormatReader for AmrwbReader {
         &self.tracks
     }
 
-    fn seek(&mut self, mode: SeekMode, to: SeekTo) -> Result<SeekedTo> {
+    fn seek(&mut self, _mode: SeekMode, _to: SeekTo) -> Result<SeekedTo> {
         if self.tracks.is_empty() {
             return seek_error(SeekErrorKind::Unseekable);
         }
