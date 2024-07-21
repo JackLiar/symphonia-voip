@@ -83,11 +83,13 @@ impl D for Decoder {
             .extra_data
             .as_ref()
             .map(|e| unsafe { *u8_slice_to_any(e.as_ref()) })
-            .unwrap_or_else(|| Default::default());
+            .unwrap_or_default();
         let sr = params.sample_rate.unwrap_or(16000);
-        let mut decoder = Self::default();
-        decoder.decode_param = param.clone();
-        decoder.decoded_data = AudioBuffer::new(960, SignalSpec::new(sr, Channels::FRONT_CENTRE));
+        let mut decoder = Self {
+            decode_param: param,
+            decoded_data: AudioBuffer::new(960, SignalSpec::new(sr, Channels::FRONT_CENTRE)),
+            ..Default::default()
+        };
 
         decoder.raw.bitstreamformat = MIME as Word16;
         decoder.raw.output_Fs = params.sample_rate.unwrap_or(16000) as i32;

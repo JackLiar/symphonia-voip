@@ -84,13 +84,13 @@ impl QueryDescriptor for EvsReader {
         )]
     }
 
-    fn score(context: &[u8]) -> u8 {
+    fn score(_context: &[u8]) -> u8 {
         255
     }
 }
 
 impl FormatReader for EvsReader {
-    fn try_new(source: MediaSourceStream, options: &FormatOptions) -> Result<Self> {
+    fn try_new(source: MediaSourceStream, _options: &FormatOptions) -> Result<Self> {
         let mut evs = Self::new(source);
         let mut consumed = 0;
 
@@ -172,7 +172,7 @@ impl FormatReader for EvsReader {
         &self.tracks
     }
 
-    fn seek(&mut self, mode: SeekMode, to: SeekTo) -> Result<SeekedTo> {
+    fn seek(&mut self, _mode: SeekMode, _to: SeekTo) -> Result<SeekedTo> {
         if self.tracks.is_empty() {
             return seek_error(SeekErrorKind::Unseekable);
         }
