@@ -9,9 +9,12 @@ Cargo.lock
 *.rtp
 *.pdf
 *.sdp
+*.wav
 
 /c-code
 /doc
 /build
 /data
 /.xmake
+/output
+/input
