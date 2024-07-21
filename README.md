@@ -5,6 +5,10 @@ I've been working with Rust for a while, howerver, I'm just a newbie learning vo
 This repo contains some voip codecs and their associating storage formats. Currently targeting codec and formats are list below:
 
 codec:
+  - G.711 PCMA (Pulse code modulation A-law/symphonia-codec-pcm)
+  - G.711 PCMU (Pulse code modulation μ-law/symphonia-codec-pcm)
+  - G.722
+  - G.722.1
   - EVS (Enhanced Voice Service)
   - AMR (Adaptive Multi-Rate)
   - AMRWB (Adaptive Multi-Rate Wideband)
