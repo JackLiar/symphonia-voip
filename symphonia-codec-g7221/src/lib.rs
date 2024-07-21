@@ -30,8 +30,8 @@ pub struct Decoder {
 unsafe impl Send for Decoder {}
 unsafe impl Sync for Decoder {}
 
-impl Decoder {
-    pub fn new() -> Self {
+impl Default for Decoder {
+    fn default() -> Self {
         Self {
             decoded_data: AudioBuffer::new(
                 G722_1_SAMPLE_RATE_16000 as u64 / 50,
@@ -43,7 +43,9 @@ impl Decoder {
             bit_per_sample: G722_1_BIT_RATE_24000,
         }
     }
+}
 
+impl Decoder {
     pub fn decode(&mut self, data: &[u8]) {
         unsafe {
             let _sample_cnt = g722_1_decode(
@@ -61,30 +63,28 @@ impl D for Decoder {
     where
         Self: Sized,
     {
-        let mut decoder = Self::new();
-        decoder.sample_rate = match params.sample_rate {
-            Some(sr) if sr == G722_1_SAMPLE_RATE_16000 || sr == G722_1_SAMPLE_RATE_32000 => sr,
+        let sample_rate = match params.sample_rate {
+            Some(sr) if [16000, 32000].contains(&sr) => sr,
             _ => {
                 return Err(Error::Unsupported(
                     "Unsupported sample rate or no sample rate is provided",
                 ))
             }
         };
-        decoder.bit_per_sample = match params.bits_per_sample {
-            Some(br)
-                if br == g722_1_bit_rates_t_G722_1_BIT_RATE_24000
-                    || br == g722_1_bit_rates_t_G722_1_BIT_RATE_32000
-                    || br == g722_1_bit_rates_t_G722_1_BIT_RATE_48000 =>
-            {
-                br
-            }
+        let bit_per_sample = match params.bits_per_sample {
+            Some(br) if [24000, 32000, 48000].contains(&br) => br,
             _ => {
                 return Err(Error::Unsupported(
                     "Unsupported bit rate or no bit rate is provided",
                 ))
             }
         };
-        decoder.params = params.clone();
+        let mut decoder = Self {
+            sample_rate,
+            bit_per_sample,
+            params: params.clone(),
+            ..Default::default()
+        };
         unsafe {
             let r = g722_1_decode_init(
                 &mut decoder.st,
