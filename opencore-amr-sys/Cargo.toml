@@ -8,7 +8,7 @@ edition = "2021"
 [build-dependencies]
 anyhow = { workspace = true }
 bindgen = { workspace = true, optional = true }
-cargo-emit = "0.2"
+cargo-emit = { workspace = true }
 
 [features]
 default = ["gen"]
