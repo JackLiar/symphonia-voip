@@ -16,6 +16,7 @@ members = [
 [workspace.dependencies]
 anyhow = { version = "1" }
 bindgen = { version = "0.69" }
+byteorder = "1"
 cargo-emit = "0.2"
 cc = { version = "1.0", features = ["parallel"] }
 hex = "0.4"
