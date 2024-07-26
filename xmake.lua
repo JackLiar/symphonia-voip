@@ -24,11 +24,14 @@ target("symphonia-voip")
         local thirdir = "$(buildir)/3rd"
         local includedir = path.join(thirdir, "include")
         local libdir = path.join(thirdir, "lib")
+        local bindir = path.join(thirdir, "bin")
         os.mkdir(includedir)
         os.mkdir(libdir)
+        os.mkdir(bindir)
         for _, pkg in pairs(target:pkgs()) do
             local installdir = pkg:installdir()
             os.cp(path.join(installdir, "include", "*"), includedir)
             os.cp(path.join(installdir, "lib", "*"), libdir)
+            os.cp(path.join(installdir, "bin", "*"), bindir)
         end
     end)
