@@ -32,7 +32,6 @@ fn gen() -> Result<()> {
         .derive_default(true);
 
     if let Ok(cpath_dir) = env::var("CPATH") {
-        cargo_emit::warning!("CPATH: {}", cpath_dir);
         bindings = bindings.clang_arg(format!("-I{}", cpath_dir))
     }
 
@@ -43,14 +42,12 @@ fn gen() -> Result<()> {
             .map(|p| format!("-I{}", p.display())),
     );
 
-    cargo_emit::warning!("damn: {:?}", library.inc_paths);
     if let Some(hdr) = library
         .inc_paths
         .iter()
         .map(|p| p.join("g722_1.h"))
         .find(|p| p.exists())
     {
-        cargo_emit::warning!("using {}", hdr.display());
         bindings = bindings.header(hdr.display().to_string());
     }
 
@@ -67,7 +64,7 @@ fn gen() -> Result<()> {
 fn main() -> Result<()> {
     #[cfg(feature = "gen")]
     gen()?;
-    cargo_emit::rustc_link_lib!("g722_1");
+    cargo_emit::rustc_link_lib!("g722_1" => "static");
 
     Ok(())
 }
