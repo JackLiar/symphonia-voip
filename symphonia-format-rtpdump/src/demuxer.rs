@@ -69,10 +69,7 @@ pub struct Channel<R> {
 
 fn pkt_queue_len<R: RtpPacket>(queue: &VecDeque<R>, delta_time: u32) -> usize {
     match (queue.front(), queue.back()) {
-        (Some(first), Some(last)) => {
-            // println!("first: {}, lst: {}", first.ts(), last.ts());
-            (last.ts().wrapping_sub(first.ts()) / delta_time) as usize + 1
-        }
+        (Some(first), Some(last)) => (last.ts().wrapping_sub(first.ts()) / delta_time) as usize + 1,
         _ => 0,
     }
 }
@@ -138,23 +135,13 @@ impl<R: RtpPacket + DummyRtpPacket> Channel<R> {
                     let gap = pkt.ts().saturating_sub(ts) / self.delta_time;
                     let overflow_cnt = (pkts.len() as u32 + gap).saturating_sub(cnt as u32);
                     if gap == 1 && overflow_cnt == 0 {
-                        // 50th pkt
+                        // [1st, 50th] pkt, and no packet is missed since last pkt
                         self.last_ts = Some(pkt.ts());
                         pkts.push_back(pkt);
-                    } else if gap == 1 && overflow_cnt > 0 {
-                        // 51th pkt
-                        if self.missed == 0 {
-                            self.pkts.push_front(pkt);
-                            break;
-                        } else {
-                            self.missed -= 1;
-                            self.last_ts = Some(pkt.ts());
-                            pkts.push_back(pkt);
-                        }
                     } else if gap > 1 && overflow_cnt == 0 {
-                        // [1st, 49th] pkt
+                        // [1st, 50th] pkt, and some packets are missed since last pkt
+                        // insert dummy pkts before current pkt
                         for i in 1..gap {
-                            // println!("in: {}", ts.wrapping_add((i + 1) * chl.delta_time));
                             pkts.push_back(R::dummy_ts(
                                 self.ssrc,
                                 ts.wrapping_add(i * self.delta_time),
@@ -162,8 +149,20 @@ impl<R: RtpPacket + DummyRtpPacket> Channel<R> {
                         }
                         self.last_ts = Some(pkt.ts());
                         pkts.push_back(pkt);
+                    } else if gap == 1 && overflow_cnt > 0 {
+                        // 51th pkt, and no packet is missed since last pkt
+                        if self.missed == 0 {
+                            // if no pkt is missed in the past, put pkt back to cache
+                            self.pkts.push_front(pkt);
+                            break;
+                        } else {
+                            // if there are pkts missed in the past, dequeue one more pkt
+                            self.missed -= 1;
+                            self.last_ts = Some(pkt.ts());
+                            pkts.push_back(pkt);
+                        }
                     } else if gap > 1 && overflow_cnt > 0 {
-                        // [52th, ) pkt
+                        // [52th, ) pkt, and some packets are missed since last pkt
                         let cnt = (cnt.saturating_sub(pkts.len())) as u32;
                         for i in 0..cnt {
                             pkts.push_back(R::dummy_ts(
@@ -259,29 +258,47 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
             Some(ts) => ts >= c.end,
         })
     }
+}
 
+impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
     pub fn get_all_pkts(&mut self, queue: &mut VecDeque<R>) {
-        for chl in self.chls.iter_mut() {
-            for pkt in chl.pkts.drain(..) {
+        let cnt = self
+            .chls
+            .iter()
+            .map(|c| pkt_queue_len(&c.pkts, c.delta_time))
+            .max()
+            .unwrap();
+
+        for chl in &mut self.chls {
+            for pkt in chl.get_pkts(cnt) {
                 queue.push_back(pkt);
             }
         }
     }
-}
 
-impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
     pub fn get_pkts(&mut self, need_align: bool) -> Option<Vec<(u32, VecDeque<R>)>> {
         if need_align && !self.aligned {
             let mut result = vec![];
+            let cnt = self
+                .chls
+                .iter()
+                .map(|c| pkt_queue_len(&c.pkts, c.delta_time))
+                .max()
+                .unwrap();
+
             for chl in &mut self.chls {
-                if let Some(last) = chl.pkts.back() {
-                    chl.last_ts = Some(last.ts());
+                if chl.pkt_cnt == 1 {
+                    // don't align channel that has just received its first packet
+                    let mut pkts: VecDeque<_> = vec![].into();
+                    for _ in 0..cnt {
+                        pkts.push_back(R::dummy(chl.ssrc));
+                    }
+                    result.push((chl.ssrc, pkts));
+                    continue;
                 }
-                let pkts = &mut chl.pkts;
-                let mut rem = pkts.split_off(pkts.len());
-                std::mem::swap(pkts, &mut rem);
-                let out = rem;
-                result.push((chl.ssrc, out));
+
+                let pkts = chl.get_pkts(cnt);
+                result.push((chl.ssrc, pkts));
             }
 
             return Some(result);
