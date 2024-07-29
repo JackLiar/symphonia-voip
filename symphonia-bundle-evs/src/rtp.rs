@@ -27,7 +27,7 @@ pub enum EVSMode {
     AMRWBIO = 1,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum HeaderType {
     ToC = 0,
     CMR = 1,
@@ -77,10 +77,9 @@ pub fn parse_evs(mut data: &[u8]) -> std::io::Result<(Vec<&[u8]>, &[u8])> {
         FramingMode::HeaderFull => {
             let mut tmp = data;
             let toc = Toc(tmp.read_u8()?);
-            match toc.header_type() {
-                HeaderType::CMR => data = &data[1..],
-                HeaderType::ToC => data = data,
-            };
+            if toc.header_type() == HeaderType::CMR {
+                data = &data[1..];
+            }
 
             loop {
                 let toc = Toc(data.read_u8()?);
