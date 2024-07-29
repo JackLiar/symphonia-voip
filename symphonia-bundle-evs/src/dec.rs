@@ -158,7 +158,7 @@ impl Decoder {
                 self.decoded_data.chan_mut(0).as_mut_ptr().cast(),
             );
 
-            if self.raw.ini_frame < MAX_FRAME_COUNTER {
+            if self.raw.ini_frame < MAX_FRAME_COUNTER as _ {
                 self.raw.ini_frame += 1;
             }
             // println!(
