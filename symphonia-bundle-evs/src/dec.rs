@@ -14,7 +14,7 @@ use symphonia_core::support_codec;
 
 use evs_codec_sys::{
     evs_dec, init_decoder, read_indices_from_djb, reset_indices_dec, syn_output, Decoder_State,
-    Word16, Word32, MIME,
+    Word16, Word32, MAX_FRAME_COUNTER, MIME,
 };
 
 use crate::consts::{CodecFormat, FrameMode, MAX_BIT_RATE};
@@ -157,6 +157,10 @@ impl Decoder {
                 (self.raw.output_Fs / 50) as Word16,
                 self.decoded_data.chan_mut(0).as_mut_ptr().cast(),
             );
+
+            if self.raw.ini_frame < MAX_FRAME_COUNTER {
+                self.raw.ini_frame += 1;
+            }
             // println!(
             //     "decoded len: {}, frames: {}, capacity: {}",
             //     self.decoded_data.chan(packet.track_id() as _).len(),
