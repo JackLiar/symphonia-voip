@@ -83,8 +83,7 @@ impl<R: RtpPacket> Channel<R> {
         self.pkts
             .iter()
             .enumerate()
-            .filter(|(_, p)| p.seq() > pkt.seq())
-            .next()
+            .find(|(_, p)| p.seq() > pkt.seq())
             .map(|(idx, _)| idx)
     }
 
@@ -227,7 +226,7 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
         let cond1 = self.chls.iter().any(|c| c.pkt_cnt == 1);
         // more than one channels have recieve packets already
         let cond2 = self.chls.iter().filter(|c| c.pkt_cnt > 0).count() > 1;
-        return cond1 && cond2;
+        cond1 && cond2
     }
 
     /// Add new rtp pkt into interval buffer, return whether found a new ssrc channel
@@ -243,7 +242,7 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
             }
         };
 
-        return self.need_align();
+        self.need_align()
     }
 
     fn any_queue_full(&self) -> bool {
@@ -412,7 +411,7 @@ mod test {
         let pkt = SimpleRtpPacket::new_seq_ts(0, 1);
         assert!(!demuxer.add_pkt(pkt));
 
-        let mut data = (1..251u32).into_iter().collect::<Vec<_>>();
+        let mut data = (1..251u32).collect::<Vec<_>>();
         data.shuffle(&mut thread_rng());
         for i in data {
             let pkt = SimpleRtpPacket::new_seq_ts(i as u16, i + 1);
@@ -447,7 +446,7 @@ mod test {
         let mut demuxer = RtpDemuxer::<SimpleRtpPacket>::new(chls);
 
         let mut pkts = vec![];
-        let mut data = (0..251u32).into_iter().collect::<Vec<_>>();
+        let mut data = (0..251u32).collect::<Vec<_>>();
         // channel 0 pkts
         data.shuffle(&mut thread_rng());
         for i in data.iter().copied() {

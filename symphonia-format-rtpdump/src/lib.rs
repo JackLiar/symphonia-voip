@@ -274,7 +274,7 @@ impl FormatReader for RtpdumpReader {
         let mut track_ts = vec![];
         for chl in &chls {
             let mut param =
-                codec_to_param(&codec).ok_or_else(|| Error::Unsupported("Unsupported codec"))?;
+                codec_to_param(codec).ok_or_else(|| Error::Unsupported("Unsupported codec"))?;
             param.with_n_frames((chl.end.saturating_sub(chl.start)) as u64);
             let track = Track::new(chl.ssrc, param);
             tracks.push(track);
@@ -419,6 +419,6 @@ impl RtpdumpReader {
             &data,
         );
         *ts += 1;
-        return Ok(pkt);
+        Ok(pkt)
     }
 }
