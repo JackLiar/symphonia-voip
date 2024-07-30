@@ -31,6 +31,7 @@
   sampleRate: 8000
   payloadSize: 32
   deltaTime: 160
+  params: "octet-align=0"
 - name: amr
   sampleRate: 8000
   payloadSize: 28
