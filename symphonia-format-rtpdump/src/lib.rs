@@ -334,6 +334,10 @@ impl FormatReader for RtpdumpReader {
             };
 
             let pkt = parse_rtp(data.as_ref()).unwrap();
+
+            if parse_rtp_event(pkt.payload()).is_ok() {
+                continue;
+            }
             let need_align = self.demuxer.add_pkt(SimpleRtpPacket::from(&pkt));
 
             let codec = self.codecs.get(&pkt.payload_type());
