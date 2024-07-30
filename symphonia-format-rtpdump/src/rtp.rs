@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::{Add, Sub};
 
@@ -67,11 +68,11 @@ pub fn parse_rtp_payload<R: RtpPacket>(
             symphonia_bundle_evs::rtp::on_evs(&mut pkt, rtp.payload())?;
             Ok(pkt)
         }
-        _ => return unsupported_error("Unsupport codec"),
+        _ => unsupported_error("Unsupport codec"),
     }
 }
 
-#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(transparent)]
 pub struct SeqNum(pub u16);
 
@@ -90,6 +91,68 @@ impl Sub for SeqNum {
     fn sub(self, rhs: Self) -> Self::Output {
         let (seq, _) = self.0.overflowing_sub(rhs.0);
         seq
+    }
+}
+
+impl PartialOrd for SeqNum {
+    fn ge(&self, other: &Self) -> bool {
+        self.0 == other.0 || self.gt(other)
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        self.0 == other.0 || self.lt(other)
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        let x = 0u16;
+        let y = other.0.wrapping_sub(self.0);
+
+        let sep = x.wrapping_add(32768);
+        if y > x && y < sep {
+            false
+        } else if y > x && y > sep {
+            true
+        } else if y < x && y > sep {
+            true
+        } else if y < x && y < sep {
+            false
+        } else {
+            false
+        }
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        let x = 0;
+        let y = other.0.wrapping_sub(self.0);
+
+        if x == y {
+            true
+        } else {
+            let sep = x.wrapping_add(32768);
+            if y > x && y < sep {
+                true
+            } else if y > x && y > sep {
+                false
+            } else if y < x && y > sep {
+                false
+            } else if y < x && y < sep {
+                true
+            } else {
+                true
+            }
+        }
+    }
+
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self == other {
+            Some(Ordering::Equal)
+        } else if self.gt(other) {
+            Some(Ordering::Greater)
+        } else if self.le(other) {
+            Some(Ordering::Less)
+        } else {
+            None
+        }
     }
 }
 
@@ -600,6 +663,26 @@ mod tests {
         let seq1 = SeqNum(0);
         let seq2 = SeqNum(65535);
         assert_eq!(seq2 - seq1, 65535);
+
+        let seq1 = SeqNum(1);
+        let seq2 = SeqNum(2);
+        assert!(seq1 < seq2);
+
+        let seq1 = SeqNum(1);
+        let seq2 = SeqNum(65535);
+        assert!(seq1 > seq2);
+
+        let seq1 = SeqNum(0);
+        let seq2 = SeqNum(32768);
+        assert!(seq1 < seq2);
+
+        let seq1 = SeqNum(0);
+        let seq2 = SeqNum(32769);
+        assert!(seq1 > seq2);
+
+        let seq1 = SeqNum(5868);
+        let seq2 = SeqNum(5867);
+        assert!(seq1 > seq2);
         Ok(())
     }
 }

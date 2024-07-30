@@ -88,6 +88,18 @@ impl<R: RtpPacket> Channel<R> {
     }
 
     pub fn add_pkt(&mut self, pkt: R) {
+        if self.start < self.end {
+            // no timestamp wrapping
+            if pkt.ts() < self.start || pkt.ts() > self.end {
+                return;
+            }
+        } else {
+            // timestamp wrapping, very likely
+            if pkt.ts() < self.end && pkt.ts() > self.start {
+                return;
+            }
+        }
+
         if let Some(last_seq) = self.pkts.back().map(|p| p.seq()) {
             if last_seq.wrapping_add(1) == pkt.seq() {
                 self.pkts.push_back(pkt);

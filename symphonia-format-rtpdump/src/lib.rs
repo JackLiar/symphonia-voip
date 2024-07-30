@@ -7,7 +7,7 @@ use std::str::FromStr;
 use binrw::{BinRead, BinResult};
 use indexmap::IndexMap;
 use log::info;
-use rtp::{codec_to_codec_type, parse_rtp_payload};
+use rtp::{codec_to_codec_type, parse_rtp_payload, SeqNum};
 use symphonia_core::audio::Channels;
 use symphonia_core::codecs::CodecParameters;
 use symphonia_core::errors::{seek_error, Error, Result, SeekErrorKind};
@@ -26,7 +26,7 @@ mod rtp;
 mod utils;
 use codec_detector::{Codec, CodecDetector};
 use demuxer::{Channel, RtpDemuxer, SimpleRtpPacket};
-use rtp::{parse_rtp, PayloadType, RawRtpPacket, RtpPacket};
+use rtp::{parse_rtp, parse_rtp_event, PayloadType, RawRtpPacket, RtpPacket};
 
 const MAGIC: &[u8] = b"#!rtpplay1.0 ";
 
@@ -201,6 +201,11 @@ impl QueryDescriptor for RtpdumpReader {
     }
 }
 
+struct LastPacket {
+    seq: SeqNum,
+    ts: u32,
+}
+
 impl FormatReader for RtpdumpReader {
     fn try_new(mut source: MediaSourceStream, _options: &FormatOptions) -> Result<Self>
     where
@@ -214,7 +219,7 @@ impl FormatReader for RtpdumpReader {
         info!("rtpdump hdr: {:?}", hdr);
         let hdr_len = source.pos();
 
-        let mut chls: IndexMap<u32, Channel<SimpleRtpPacket>> = Default::default();
+        let mut chls: IndexMap<u32, (Channel<SimpleRtpPacket>, LastPacket)> = Default::default();
         let mut detector = CodecDetector::new();
         detector
             .get_features_from_yaml(Path::new("codec.yaml"))
@@ -240,15 +245,21 @@ impl FormatReader for RtpdumpReader {
                         start: pkt.ts(),
                         ..Default::default()
                     };
-                    chls.insert(pkt.ssrc(), chl);
+                    let last = LastPacket {
+                        seq: SeqNum(pkt.seq()),
+                        ts: pkt.ts(),
+                    };
+                    chls.insert(pkt.ssrc(), (chl, last));
                 }
-                Some(chl) => {
+                Some((chl, last)) => {
+                    let seq = SeqNum(pkt.seq());
                     chl.start = (chl.start).min(pkt.ts());
-                    if chl.end == 0 {
+
+                    if chl.end == 0 || seq > last.seq {
                         chl.end = pkt.ts();
-                    } else {
-                        chl.end = (chl.end).max(pkt.ts());
                     }
+                    last.seq = seq;
+                    last.ts = pkt.ts();
                 }
             };
 
@@ -268,7 +279,7 @@ impl FormatReader for RtpdumpReader {
             todo!("Support multi codec/change codec")
         }
 
-        let chls: Vec<Channel<SimpleRtpPacket>> = chls.into_values().collect();
+        let chls: Vec<Channel<SimpleRtpPacket>> = chls.into_values().map(|(chl, _)| chl).collect();
         let codec = result.values().collect::<Vec<_>>()[0];
         let mut tracks = vec![];
         let mut track_ts = vec![];
