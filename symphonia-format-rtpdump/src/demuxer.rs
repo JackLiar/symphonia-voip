@@ -177,7 +177,7 @@ impl<R: RtpPacket + DummyRtpPacket> Channel<R> {
                 (None, Some(ts)) => {
                     if self.end <= ts {
                         // no more pkts to dequeue, channel is out, fill dummy to 50
-                        let cnt = cnt.wrapping_sub(pkts.len()) as u32;
+                        let cnt = cnt.saturating_sub(pkts.len()) as u32;
                         for i in 0..cnt {
                             pkts.push_back(R::dummy_ts(
                                 self.ssrc,
