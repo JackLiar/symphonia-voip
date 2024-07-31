@@ -229,11 +229,12 @@ impl CodecDetector {
                             stat.insert(codec.clone(), 1);
                             self.codec_stat.insert(pkt.payload_type(), stat);
                         }
-                        Some(stat) => {
-                            if let Some(stat) = stat.get_mut(codec) {
-                                *stat += 1;
+                        Some(stat) => match stat.get_mut(codec) {
+                            Some(stat) => *stat += 1,
+                            None => {
+                                stat.insert(codec.clone(), 1);
                             }
-                        }
+                        },
                     }
                 }
             }
