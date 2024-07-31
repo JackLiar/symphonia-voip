@@ -523,6 +523,10 @@ pub fn detect_not_rtp(data: &[u8], ssrcs: &[u32]) -> bool {
     }
 
     if data.len() >= 8 {
+        if (64..=95).contains(&(data[1] & 0b0111_1111)) {
+            return true;
+        }
+
         // skip RTCP packets
         let ssrc = ((data[4] as u32) << 24)
             | ((data[5] as u32) << 16)
