@@ -66,9 +66,7 @@ impl CodecFeature {
     }
 
     fn set_radio(&mut self) {
-        self.ratio = self
-            .payload_size
-            .map(|ps| Fraction::new(self.delta_time, ps));
+        self.ratio = self.payload_size.map(|ps| Fraction::new(self.delta_time, ps));
     }
 }
 
@@ -184,8 +182,7 @@ impl CodecDetector {
             Some(cnt) => *cnt += 1,
         };
 
-        let delta_time = pkt.ts().wrapping_sub(self.last_ts(pkt))
-            / (pkt.seq().wrapping_sub(self.last_seq(pkt))) as u32;
+        let delta_time = pkt.ts().wrapping_sub(self.last_ts(pkt)) / (pkt.seq().wrapping_sub(self.last_seq(pkt))) as u32;
         self.last_seq.insert(pkt.ssrc(), pkt.seq());
         self.last_ts.insert(pkt.ssrc(), pkt.ts());
 
@@ -194,17 +191,23 @@ impl CodecDetector {
         } else {
             Some(pkt.payload().len() as u16)
         };
-        let ft = CodecFeature::new(payload_len, delta_time);
+        let pktft = CodecFeature::new(payload_len, delta_time);
 
         let mut pkt_is_amrwb = false;
         for (codec, fts) in &self.features {
-            for f in fts {
-                let ft_match = match ft.payload_size {
+            for ft in fts {
+                let ft_match = match pktft.payload_size {
                     Some(psize) => {
-                        (f.ratio == ft.ratio && !f.sid_frame)
-                            || (f.sid_frame && psize as usize == pkt.payload().len())
+                        // Cond1: ratio is equal, but MUST not a sid frame feature.
+                        // Since amr/amrwb/evs SID frame's delta time could be in [160, 2560]
+                        // which may conflict with other codec's feature.
+                        let cond1 = ft.ratio == pktft.ratio && !ft.sid_frame;
+                        // Cond2: pkt is SID frame and payload size matches the feature.
+                        // This is the actual classify logic.
+                        let cond2 = ft.sid_frame && psize as usize == pkt.payload().len();
+                        cond1 || cond2
                     }
-                    None => f.delta_time == ft.delta_time,
+                    None => ft.delta_time == pktft.delta_time,
                 };
                 if ft_match {
                     let cname = codec.name.as_str();
