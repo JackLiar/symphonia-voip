@@ -73,6 +73,11 @@
   sampleRate: 16000
   payloadSize: 33
   deltaTime: 320
+- name: evs
+  sampleRate: 16000
+  payloadSize: 6
+  deltaTime: 320
+  sidFrame: true
 # - name: evs
 #   sampleRate: 24000
 #   payloadSize: 33
