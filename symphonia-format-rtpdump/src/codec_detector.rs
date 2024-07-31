@@ -193,6 +193,7 @@ impl CodecDetector {
         };
         let ft = CodecFeature::new(payload_len, delta_time);
 
+        let mut pkt_is_amrwb = false;
         for (codec, fts) in &self.features {
             for f in fts {
                 let ft_match = match ft.payload_size {
@@ -202,13 +203,14 @@ impl CodecDetector {
                 if ft_match {
                     let cname = codec.name.as_str();
                     let codec = if cname == "amrwb" || cname == "evs" {
-                        if is_amrwb(pkt.payload()) {
+                        if is_amrwb(pkt.payload()) && cname == "amrwb" {
+                            pkt_is_amrwb = true;
                             self.features
                                 .iter()
                                 .find(|(c, _)| c.name.as_str() == "amrwb")
                                 .map(|(c, _)| c)
                                 .unwrap()
-                        } else if is_evs(pkt.payload()) {
+                        } else if is_evs(pkt.payload()) && !pkt_is_amrwb {
                             self.features
                                 .iter()
                                 .find(|(c, _)| c.name.as_str() == "evs")
