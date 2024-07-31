@@ -153,10 +153,7 @@ impl<R: RtpPacket + DummyRtpPacket> Channel<R> {
                         // [1st, 50th] pkt, and some packets are missed since last pkt
                         // insert dummy pkts before current pkt
                         for i in 1..gap {
-                            pkts.push_back(R::dummy_ts(
-                                self.ssrc,
-                                ts.wrapping_add(i * self.delta_time),
-                            ));
+                            pkts.push_back(R::dummy_ts(self.ssrc, ts.wrapping_add(i * self.delta_time)));
                         }
                         self.last_ts = Some(pkt.ts());
                         pkts.push_back(pkt);
@@ -176,10 +173,7 @@ impl<R: RtpPacket + DummyRtpPacket> Channel<R> {
                         // [52th, ) pkt, and some packets are missed since last pkt
                         let cnt = (cnt.saturating_sub(pkts.len())) as u32;
                         for i in 0..cnt {
-                            pkts.push_back(R::dummy_ts(
-                                self.ssrc,
-                                ts.wrapping_add((i + 1) * self.delta_time),
-                            ));
+                            pkts.push_back(R::dummy_ts(self.ssrc, ts.wrapping_add((i + 1) * self.delta_time)));
                         }
                         self.last_ts = Some(ts.wrapping_add(cnt * self.delta_time));
                         self.pkts.push_front(pkt);
@@ -191,10 +185,7 @@ impl<R: RtpPacket + DummyRtpPacket> Channel<R> {
                         // no more pkts to dequeue, channel is out, fill dummy to 50
                         let cnt = cnt.saturating_sub(pkts.len()) as u32;
                         for i in 0..cnt {
-                            pkts.push_back(R::dummy_ts(
-                                self.ssrc,
-                                ts.wrapping_add((i + 1) * self.delta_time),
-                            ));
+                            pkts.push_back(R::dummy_ts(self.ssrc, ts.wrapping_add((i + 1) * self.delta_time)));
                         }
                         self.last_ts = Some(ts.wrapping_add((cnt) * self.delta_time));
                         break;
@@ -258,9 +249,7 @@ impl<R: RtpPacket + std::default::Default> RtpDemuxer<R> {
     }
 
     fn any_queue_full(&self) -> bool {
-        self.chls
-            .iter()
-            .any(|chl| chl.is_queue_full(self.sort_uniq_queue_size))
+        self.chls.iter().any(|chl| chl.is_queue_full(self.sort_uniq_queue_size))
     }
 
     pub fn all_chl_finished(&self) -> bool {
