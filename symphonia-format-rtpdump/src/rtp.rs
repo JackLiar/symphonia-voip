@@ -12,9 +12,7 @@ use combine::{look_ahead, many1, Parser};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::Serialize;
-use symphonia_core::codecs::{
-    CodecParameters, CodecType, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW,
-};
+use symphonia_core::codecs::{CodecParameters, CodecType, CODEC_TYPE_PCM_ALAW, CODEC_TYPE_PCM_MULAW};
 use symphonia_core::errors::unsupported_error;
 
 use symphonia_bundle_amr::rtp::{on_amr_amrwb_be, on_amr_amrwb_oa};
@@ -40,10 +38,7 @@ pub fn codec_to_codec_type(codec: &Codec) -> Option<CodecType> {
     Some(ct)
 }
 
-pub fn parse_rtp_payload<R: RtpPacket>(
-    params: &CodecParameters,
-    rtp: &R,
-) -> symphonia_core::errors::Result<Vec<u8>> {
+pub fn parse_rtp_payload<R: RtpPacket>(params: &CodecParameters, rtp: &R) -> symphonia_core::errors::Result<Vec<u8>> {
     match params.codec {
         CODEC_TYPE_G722_1 | CODEC_TYPE_G722 | CODEC_TYPE_PCM_ALAW | CODEC_TYPE_PCM_MULAW => {
             return Ok(rtp.payload().to_vec())
@@ -104,43 +99,13 @@ impl PartialOrd for SeqNum {
     }
 
     fn gt(&self, other: &Self) -> bool {
-        let x = 0u16;
         let y = other.0.wrapping_sub(self.0);
-
-        let sep = x.wrapping_add(32768);
-        if y > x && y < sep {
-            false
-        } else if y > x && y > sep {
-            true
-        } else if y < x && y > sep {
-            true
-        } else if y < x && y < sep {
-            false
-        } else {
-            false
-        }
+        y != 0 && y > 32768
     }
 
     fn lt(&self, other: &Self) -> bool {
-        let x = 0;
         let y = other.0.wrapping_sub(self.0);
-
-        if x == y {
-            true
-        } else {
-            let sep = x.wrapping_add(32768);
-            if y > x && y < sep {
-                true
-            } else if y > x && y > sep {
-                false
-            } else if y < x && y > sep {
-                false
-            } else if y < x && y < sep {
-                true
-            } else {
-                true
-            }
-        }
+        y != 0 && y <= 32768
     }
 
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -418,9 +383,7 @@ pub trait RtpPacket {
                                     .then(|(id, len)| take(len as usize + 1).map(move |r| (id, r)))
                                     .skip(skip_many(byte(0x00)))
                                     .map(|(id, value)| Extension { id, value });
-                                many1::<Vec<_>, _, _>(ext_parser)
-                                    .parse(a)
-                                    .map(|(exts, _)| exts)
+                                many1::<Vec<_>, _, _>(ext_parser).parse(a).map(|(exts, _)| exts)
                             } else {
                                 Ok(vec![])
                             }
@@ -442,9 +405,7 @@ pub trait RtpPacket {
                                     .then(|(id, len)| take(len).map(move |r| (id, r)))
                                     .skip(skip_many(byte(0x00)))
                                     .map(|(id, value)| Extension { id, value });
-                                many1::<Vec<_>, _, _>(ext_parser)
-                                    .parse(a)
-                                    .map(|(exts, _)| exts)
+                                many1::<Vec<_>, _, _>(ext_parser).parse(a).map(|(exts, _)| exts)
                             } else {
                                 Ok(vec![])
                             }
@@ -528,10 +489,7 @@ pub fn detect_not_rtp(data: &[u8], ssrcs: &[u32]) -> bool {
         }
 
         // skip RTCP packets
-        let ssrc = ((data[4] as u32) << 24)
-            | ((data[5] as u32) << 16)
-            | ((data[6] as u32) << 8)
-            | (data[7] as u32);
+        let ssrc = ((data[4] as u32) << 24) | ((data[5] as u32) << 16) | ((data[6] as u32) << 8) | (data[7] as u32);
         if ssrcs.contains(&ssrc) {
             return true;
         }
@@ -631,10 +589,9 @@ mod tests {
     #[test]
     fn test_parse_rtp() -> Result<()> {
         let data: &[u8] = &[
-            0x80, 0x7f, 0x00, 0x02, 0x08, 0x37, 0x76, 0x60, 0x00, 0x84, 0x1a, 0xa8, 0x8b, 0x73,
-            0x6f, 0xf5, 0x58, 0x4a, 0xc0, 0x90, 0x44, 0xc4, 0x50, 0x16, 0x03, 0xd8, 0x07, 0xfe,
-            0x19, 0x2b, 0x80, 0x28, 0x02, 0x00, 0x80, 0x00, 0x16, 0x70, 0x90, 0x5c, 0x69, 0xdc,
-            0xf0, 0xa9, 0x5c,
+            0x80, 0x7f, 0x00, 0x02, 0x08, 0x37, 0x76, 0x60, 0x00, 0x84, 0x1a, 0xa8, 0x8b, 0x73, 0x6f, 0xf5, 0x58, 0x4a,
+            0xc0, 0x90, 0x44, 0xc4, 0x50, 0x16, 0x03, 0xd8, 0x07, 0xfe, 0x19, 0x2b, 0x80, 0x28, 0x02, 0x00, 0x80, 0x00,
+            0x16, 0x70, 0x90, 0x5c, 0x69, 0xdc, 0xf0, 0xa9, 0x5c,
         ];
         let rtp = parse_rtp(data)?;
         assert!(!rtp.marked());
