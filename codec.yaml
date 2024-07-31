@@ -52,6 +52,17 @@
   payloadSize: 61
   deltaTime: 320
   params: "octet-align=0"
+- name: amrwb
+  sampleRate: 16000
+  payloadSize: 7
+  deltaTime: 320
+  sidFrame: true
+- name: amrwb
+  sampleRate: 16000
+  payloadSize: 7
+  deltaTime: 320
+  sidFrame: true
+  params: "octat-align=0"
 
 # evs
 # - name: evs

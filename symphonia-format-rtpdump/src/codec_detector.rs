@@ -51,6 +51,8 @@ pub struct CodecFeature {
     delta_time: u32,
     #[serde(skip_deserializing)]
     ratio: Option<Fraction>,
+    #[serde(default)]
+    sid_frame: bool,
 }
 
 impl CodecFeature {
@@ -59,6 +61,7 @@ impl CodecFeature {
             payload_size,
             delta_time,
             ratio: payload_size.map(|ps| Fraction::new(delta_time, ps)),
+            sid_frame: false,
         }
     }
 
@@ -197,7 +200,10 @@ impl CodecDetector {
         for (codec, fts) in &self.features {
             for f in fts {
                 let ft_match = match ft.payload_size {
-                    Some(_) => f.ratio == ft.ratio,
+                    Some(psize) => {
+                        (f.ratio == ft.ratio && !f.sid_frame)
+                            || (f.sid_frame && psize as usize == pkt.payload().len())
+                    }
                     None => f.delta_time == ft.delta_time,
                 };
                 if ft_match {
