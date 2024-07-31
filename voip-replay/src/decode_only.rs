@@ -15,7 +15,7 @@ use symphonia::core::formats::FormatReader;
 
 use crate::{do_verification, ignore_end_of_stream_error};
 
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms, dead_code)]
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, Default)]
 pub enum CompressionCode {
@@ -32,7 +32,7 @@ pub fn decode_only_output(
     decode_opts: &DecoderOptions,
 ) -> Result<i32> {
     let output_dir = args.get_one::<PathBuf>("output-dir").unwrap();
-    std::fs::create_dir_all(&output_dir)?;
+    std::fs::create_dir_all(output_dir)?;
     let mut decoders = HashMap::new();
     let mut pcms = HashMap::new();
     for track in reader.tracks() {
@@ -117,7 +117,7 @@ pub fn decode_only_output(
         file.write_all(&1u16.to_le_bytes())?;
         // sample rate
         file.write_all(&sr.to_le_bytes())?;
-        // ave bytes per seconds
+        // avg bytes per seconds
         file.write_all(&(sr * 2 * 1).to_le_bytes())?;
         // block align
         file.write_all(&(2u16 * 1).to_le_bytes())?;

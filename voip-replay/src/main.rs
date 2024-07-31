@@ -50,7 +50,7 @@ fn main() {
                 .short('s')
                 .value_name("TIME")
                 .help("Seek to the given time in seconds")
-                .conflicts_with_all(&["verify", "decode-only", "verify-only", "probe-only"]),
+                .conflicts_with_all(["verify", "decode-only", "verify-only", "probe-only"]),
         )
         .arg(
             Arg::new("track")
@@ -64,21 +64,21 @@ fn main() {
                 .long("decode-only")
                 .action(ArgAction::SetTrue)
                 .help("Decode, but do not play the audio")
-                .conflicts_with_all(&["probe-only", "verify-only", "verify"]),
+                .conflicts_with_all(["probe-only", "verify-only", "verify"]),
         )
         .arg(
             Arg::new("probe-only")
                 .long("probe-only")
                 .action(ArgAction::SetTrue)
                 .help("Only probe the input for metadata")
-                .conflicts_with_all(&["decode-only", "verify-only"]),
+                .conflicts_with_all(["decode-only", "verify-only"]),
         )
         .arg(
             Arg::new("verify-only")
                 .long("verify-only")
                 .action(ArgAction::SetTrue)
                 .help("Verify the decoded audio is valid, but do not play the audio")
-                .conflicts_with_all(&["verify"]),
+                .conflicts_with_all(["verify"]),
         )
         .arg(
             Arg::new("verify")
