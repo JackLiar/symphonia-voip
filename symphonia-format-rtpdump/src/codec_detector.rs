@@ -204,7 +204,7 @@ impl CodecDetector {
                         let cond1 = ft.ratio == pktft.ratio && !ft.sid_frame;
                         // Cond2: pkt is SID frame and payload size matches the feature.
                         // This is the actual classify logic.
-                        let cond2 = ft.sid_frame && psize as usize == pkt.payload().len();
+                        let cond2 = ft.sid_frame && payload_len == ft.payload_size;
                         cond1 || cond2
                     }
                     None => ft.delta_time == pktft.delta_time,
