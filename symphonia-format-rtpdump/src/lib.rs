@@ -162,9 +162,6 @@ impl FormatReader for RtpdumpReader {
         if result.is_empty() {
             return Err(Error::Unsupported("Failed to detect codec"));
         }
-        if result.len() != 1 {
-            todo!("Support multi codec/change codec")
-        }
 
         let chls: Vec<Channel<SimpleRtpPacket>> = chls.into_values().map(|(chl, _)| chl).collect();
         let codec = result.values().collect::<Vec<_>>()[0];
@@ -242,12 +239,21 @@ impl FormatReader for RtpdumpReader {
 
             let codec = self.codecs.get(&pkt.payload_type());
             let chl = self.demuxer.chls.iter_mut().find(|c| c.ssrc == pkt.ssrc());
-            match (codec, chl) {
-                (Some(codec), Some(chl)) => {
+            let track = self.tracks.iter_mut().find(|t| t.id == pkt.ssrc());
+            match (codec, chl, track) {
+                (Some(codec), Some(chl), Some(track)) => {
                     match codec.delta_time {
                         Some(dt) => chl.delta_time = dt,
                         None => chl.delta_time = codec.sample_rate / 50,
                     };
+                    let mut param = match codec_to_param(codec) {
+                        Some(p) => p,
+                        None => {
+                            warn!("Unsupported codec: {:?}", codec);
+                            return Err(Error::Unsupported("Unsupported codec"));
+                        }
+                    };
+                    track.codec_params = param;
                 }
                 _ => unreachable!("this should never happens"),
             };
