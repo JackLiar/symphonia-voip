@@ -15,6 +15,10 @@ use symphonia_bundle_evs::rtp::is_evs;
 
 use crate::rtp::{parse_rtp_event, PayloadType, RtpPacket};
 
+const fn default_frame_duration() -> u16 {
+    20
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, Hash, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Codec {
@@ -27,6 +31,8 @@ pub struct Codec {
     pub max_frames_per_packet: Option<u64>,
     pub payload_type: Option<u8>,
     pub delta_time: Option<u32>,
+    #[serde(default = "default_frame_duration")]
+    pub frame_duration: u16,
 }
 
 impl Codec {
@@ -40,6 +46,7 @@ impl Codec {
             max_frames_per_packet: None,
             payload_type: None,
             delta_time: None,
+            frame_duration: default_frame_duration(),
         }
     }
 }
@@ -197,7 +204,7 @@ impl CodecDetector {
         for (codec, fts) in &self.features {
             for ft in fts {
                 let ft_match = match pktft.payload_size {
-                    Some(psize) => {
+                    Some(_) => {
                         // Cond1: ratio is equal, but MUST not a sid frame feature.
                         // Since amr/amrwb/evs SID frame's delta time could be in [160, 2560]
                         // which may conflict with other codec's feature.
