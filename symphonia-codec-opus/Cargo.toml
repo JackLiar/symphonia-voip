@@ -1,0 +1,10 @@
+[package]
+name = "symphonia-codec-opus"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+
+[features]
+osce = []
