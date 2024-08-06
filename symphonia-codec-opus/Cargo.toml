@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-
+anyhow = "1"
+combine = "4"
+thiserror = "1"
 
 [features]
 osce = []
