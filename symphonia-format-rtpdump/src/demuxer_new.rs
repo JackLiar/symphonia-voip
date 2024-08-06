@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 use std::time::Duration;
 
+use itertools::Itertools;
+
 use crate::rtp::{RawRtpPacket, RtpPacket};
 
 pub trait DummyRtpPacket: RtpPacket {
@@ -158,12 +160,30 @@ impl<R: RtpPacket + DummyRtpPacket> Channel<R> {
             self.ingress.push_back(pkt);
         }
 
-        if !self.ingress_full(self.ingress_sort_uniq_len) {
+        self.get_pkt()
+    }
+
+    // Only effects when channel is not active
+    pub fn sync(&mut self, ts: Duration) {
+        self.timestamp = ts;
+        if self.active() {
+            return;
+        }
+
+        let dur = self.timestamp.saturating_sub(self.last_dummy_ts).as_millis();
+        if (dur / self.frame_dur as u128) != 0 {
+            self.egress.push_back(R::dummy(self.ssrc));
+            self.last_dummy_ts = ts;
+        }
+    }
+
+    pub fn get_pkt(&mut self) -> Option<R> {
+        if !self.finished() && !self.ingress_full(self.ingress_sort_uniq_len) {
             return None;
         }
 
         let pkt = match self.ingress.pop_front() {
-            None => unreachable!("Ingress queue always not empty if full"),
+            None => return None,
             Some(pkt) => pkt,
         };
 
@@ -185,20 +205,6 @@ impl<R: RtpPacket + DummyRtpPacket> Channel<R> {
                 }
                 pkt
             }
-        }
-    }
-
-    // Only effects when channel is not active
-    pub fn sync(&mut self, ts: Duration) {
-        self.timestamp = ts;
-        if self.active() {
-            return;
-        }
-
-        let dur = self.timestamp.saturating_sub(self.last_dummy_ts).as_millis();
-        if (dur / self.frame_dur as u128) != 0 {
-            self.egress.push_back(R::dummy(self.ssrc));
-            self.last_dummy_ts = ts;
         }
     }
 }
@@ -231,6 +237,16 @@ impl<R: RtpPacket + DummyRtpPacket + std::default::Default> RtpDemuxer<R> {
             chl.sync(ts);
         }
         pkt
+    }
+
+    pub fn get_pkt(&mut self) -> Option<R> {
+        for chl in &mut self.chls.iter_mut().sorted_by_key(|c| c.ingress_len()) {
+            if let Some(pkt) = chl.get_pkt() {
+                return Some(pkt);
+            }
+        }
+
+        None
     }
 
     pub fn get_all_pkts(&mut self, queue: &mut VecDeque<R>) {

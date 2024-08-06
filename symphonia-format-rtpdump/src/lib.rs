@@ -212,8 +212,10 @@ impl FormatReader for RtpdumpReader {
         loop {
             let (offset, data) = match read_rd_pkt(&mut self.reader) {
                 Ok(data) => data,
-                Err(e) => {
-                    // self.demuxer.get_all_pkts(&mut self.cache);
+                Err(_) => {
+                    if let Some(pkt) = self.demuxer.get_pkt() {
+                        return self.rtp_pkt_to_symphonia_pkt(pkt);
+                    }
                     debug!("total pkt cnt: {}", self.pkt_cnt);
                     return Err(Error::IoError(IOError::new(ErrorKind::UnexpectedEof, "end of stream")));
                 }
