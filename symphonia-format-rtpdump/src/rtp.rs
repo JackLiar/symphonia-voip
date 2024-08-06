@@ -632,6 +632,12 @@ mod tests {
         let seq1 = SeqNum(1);
         let seq2 = SeqNum(65535);
         assert!(seq1 > seq2);
+        assert!(!(seq1 < seq2));
+
+        let seq1 = SeqNum(65535);
+        let seq2 = SeqNum(1);
+        assert!(seq1 < seq2);
+        assert!(!(seq1 > seq2));
 
         let seq1 = SeqNum(0);
         let seq2 = SeqNum(32768);

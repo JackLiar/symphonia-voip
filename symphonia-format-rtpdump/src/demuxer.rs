@@ -75,6 +75,13 @@ fn pkt_queue_len<R: RtpPacket>(queue: &VecDeque<R>, delta_time: u32) -> usize {
 }
 
 impl<R: RtpPacket> Channel<R> {
+    fn queue_len(&self) -> usize {
+        match (self.pkts.front(), self.pkts.back()) {
+            (Some(first), Some(last)) => (last.ts().wrapping_sub(first.ts()) / self.delta_time) as usize + 1,
+            _ => 0,
+        }
+    }
+
     pub fn is_queue_full(&self, max: usize) -> bool {
         pkt_queue_len(&self.pkts, self.delta_time) > max
     }

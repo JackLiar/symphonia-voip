@@ -1,5 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::ops::Add;
 use std::str::FromStr;
+use std::time::Duration;
 
 use binrw::{BinRead, BinResult};
 use symphonia_core::errors::Result;
@@ -84,6 +86,14 @@ impl Default for FileHeader {
     }
 }
 
+impl FileHeader {
+    pub fn start_ts(&self) -> Duration {
+        let sec = Duration::from_secs(self.start_sec as _);
+        let micros = Duration::from_micros(self.start_usec as _);
+        sec.add(micros)
+    }
+}
+
 #[derive(BinRead, Clone, Copy, Debug, Default)]
 #[repr(C)]
 pub struct RDPacket {
@@ -95,10 +105,13 @@ pub struct RDPacket {
     pub offset: u32,
 }
 
-pub fn read_rd_pkt(source: &mut MediaSourceStream) -> Result<Box<[u8]>> {
+pub fn read_rd_pkt(source: &mut MediaSourceStream) -> Result<(Duration, Box<[u8]>)> {
     let len = source.read_be_u16()?;
     let org_len = source.read_be_u16()?;
     let offset = source.read_be_u32()?;
     let pkt = RDPacket { len, org_len, offset };
-    Ok(source.read_boxed_slice_exact(pkt.org_len as usize)?)
+    Ok((
+        Duration::from_micros(offset as _),
+        source.read_boxed_slice_exact(pkt.org_len as usize)?,
+    ))
 }

@@ -1,6 +1,8 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::io::{Error as IOError, ErrorKind, Seek, SeekFrom};
+use std::ops::Add;
 use std::path::Path;
+use std::time::Duration;
 
 use binrw::BinRead;
 use indexmap::IndexMap;
@@ -18,12 +20,14 @@ use symphonia_core::units::TimeBase;
 
 mod codec_detector;
 mod demuxer;
+mod demuxer_new;
 mod format;
 mod rtp;
 mod utils;
 
 use codec_detector::{Codec, CodecDetector};
-use demuxer::{Channel, RtpDemuxer, SimpleRtpPacket};
+// use demuxer::{Channel, RtpDemuxer, SimpleRtpPacket};
+use demuxer_new::{Channel, RtpDemuxer, SimpleRtpPacket};
 use format::{read_rd_pkt, FileHeader, MAGIC};
 use rtp::{parse_rtp, parse_rtp_event, PayloadType, RawRtpPacket, RtpPacket};
 
@@ -70,8 +74,9 @@ pub struct RtpdumpReader {
     cues: Vec<Cue>,
     metadata: MetadataLog,
     codecs: HashMap<PayloadType, Codec>,
-    cache: VecDeque<SimpleRtpPacket>,
     pkt_cnt: usize,
+    start_ts: Duration,
+    rd_pkt_cnt: u64,
 }
 
 impl QueryDescriptor for RtpdumpReader {
@@ -112,7 +117,7 @@ impl FormatReader for RtpdumpReader {
         let mut detector = CodecDetector::new();
         detector.get_features_from_yaml(Path::new("codec.yaml")).unwrap();
         loop {
-            let pkt = match read_rd_pkt(&mut source) {
+            let (offset, pkt) = match read_rd_pkt(&mut source) {
                 Ok(pkt) => pkt,
                 Err(Error::IoError(e)) => {
                     if e.kind() == ErrorKind::UnexpectedEof {
@@ -130,6 +135,9 @@ impl FormatReader for RtpdumpReader {
                     let chl = Channel {
                         ssrc: pkt.ssrc(),
                         start: pkt.ts(),
+                        first_packet: hdr.start_ts().add(offset),
+                        ingress_sort_uniq_len: 250,
+                        frame_dur: 20,
                         ..Default::default()
                     };
                     let last = LastPacket {
@@ -141,6 +149,7 @@ impl FormatReader for RtpdumpReader {
                 Some((chl, last)) => {
                     let seq = SeqNum(pkt.seq());
                     chl.start = (chl.start).min(pkt.ts());
+                    chl.last_packet = hdr.start_ts().add(offset);
 
                     if chl.end == 0 || seq > last.seq {
                         chl.end = pkt.ts();
@@ -189,8 +198,9 @@ impl FormatReader for RtpdumpReader {
             cues: vec![],
             metadata: Default::default(),
             codecs: result.clone(),
-            cache: vec![].into(),
             pkt_cnt: 0,
+            start_ts: hdr.start_ts(),
+            rd_pkt_cnt: 0,
         };
 
         r.reader.seek(SeekFrom::Start(hdr_len))?;
@@ -199,44 +209,23 @@ impl FormatReader for RtpdumpReader {
     }
 
     fn next_packet(&mut self) -> Result<Packet> {
-        if !self.cache.is_empty() {
-            let pkt = self.get_pkt_from_cache()?;
-            return self.rtp_pkt_to_symphonia_pkt(pkt);
-        }
-
         loop {
-            if self.demuxer.all_chl_finished() {
-                self.demuxer.get_all_pkts(&mut self.cache);
-                if !self.cache.is_empty() {
-                    let pkt = self.get_pkt_from_cache()?;
-                    return self.rtp_pkt_to_symphonia_pkt(pkt);
-                } else {
+            let (offset, data) = match read_rd_pkt(&mut self.reader) {
+                Ok(data) => data,
+                Err(e) => {
+                    // self.demuxer.get_all_pkts(&mut self.cache);
                     debug!("total pkt cnt: {}", self.pkt_cnt);
                     return Err(Error::IoError(IOError::new(ErrorKind::UnexpectedEof, "end of stream")));
                 }
-            }
-
-            let data = match read_rd_pkt(&mut self.reader) {
-                Ok(data) => data,
-                Err(e) => {
-                    self.demuxer.get_all_pkts(&mut self.cache);
-                    if !self.cache.is_empty() {
-                        let pkt = self.get_pkt_from_cache()?;
-                        return self.rtp_pkt_to_symphonia_pkt(pkt);
-                    } else {
-                        debug!("total pkt cnt: {}", self.pkt_cnt);
-                        return Err(e);
-                    }
-                }
             };
+            self.rd_pkt_cnt += 1;
+            println!("rd pkt cnt: {}", self.rd_pkt_cnt);
 
             let pkt = parse_rtp(data.as_ref()).unwrap();
 
             if parse_rtp_event(pkt.payload()).is_ok() {
                 continue;
             }
-            let need_align = self.demuxer.add_pkt(SimpleRtpPacket::from(&pkt));
-
             let codec = self.codecs.get(&pkt.payload_type());
             let chl = self.demuxer.chls.iter_mut().find(|c| c.ssrc == pkt.ssrc());
             let track = self.tracks.iter_mut().find(|t| t.id == pkt.ssrc());
@@ -246,7 +235,7 @@ impl FormatReader for RtpdumpReader {
                         Some(dt) => chl.delta_time = dt,
                         None => chl.delta_time = codec.sample_rate / 50,
                     };
-                    let mut param = match codec_to_param(codec) {
+                    let param = match codec_to_param(codec) {
                         Some(p) => p,
                         None => {
                             warn!("Unsupported codec: {:?}", codec);
@@ -255,19 +244,23 @@ impl FormatReader for RtpdumpReader {
                     };
                     track.codec_params = param;
                 }
-                _ => unreachable!("this should never happens"),
+                _ => {
+                    unreachable!(
+                        "this should never happens: {:?} {:?} {:#010x}",
+                        pkt.payload_type(),
+                        codec,
+                        pkt.ssrc()
+                    )
+                }
             };
 
-            if let Some(pkts) = self.demuxer.get_pkts(need_align) {
-                for (_ssrc, pkts) in pkts {
-                    self.cache.extend(pkts);
-                }
-                break;
+            if let Some(pkt) = self
+                .demuxer
+                .add_pkt(SimpleRtpPacket::from(&pkt), self.start_ts.add(offset))
+            {
+                return self.rtp_pkt_to_symphonia_pkt(pkt);
             }
         }
-
-        let pkt = self.get_pkt_from_cache()?;
-        self.rtp_pkt_to_symphonia_pkt(pkt)
     }
 
     fn metadata(&mut self) -> Metadata<'_> {
@@ -296,16 +289,6 @@ impl FormatReader for RtpdumpReader {
 }
 
 impl RtpdumpReader {
-    fn get_pkt_from_cache(&mut self) -> Result<SimpleRtpPacket> {
-        match self.cache.pop_front() {
-            None => Err(Error::IoError(IOError::new(ErrorKind::UnexpectedEof, ""))),
-            Some(pkt) => {
-                self.pkt_cnt += 1;
-                Ok(pkt)
-            }
-        }
-    }
-
     fn rtp_pkt_to_symphonia_pkt(&mut self, pkt: SimpleRtpPacket) -> Result<Packet> {
         let track = self.tracks.iter().find(|t| t.id == pkt.ssrc()).unwrap();
         let ts = self
@@ -318,7 +301,13 @@ impl RtpdumpReader {
         let data = if pkt.payload().is_empty() {
             vec![]
         } else {
-            parse_rtp_payload(&track.codec_params, &pkt).unwrap_or_default()
+            match parse_rtp_payload(&track.codec_params, &pkt) {
+                Ok(data) => data,
+                Err(e) => {
+                    eprintln!("Failed to decode rtp papyload, {}", e);
+                    vec![]
+                }
+            }
         };
 
         let pkt = Packet::new_from_slice(
