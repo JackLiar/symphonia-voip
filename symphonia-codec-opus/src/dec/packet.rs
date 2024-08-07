@@ -3,6 +3,7 @@ use combine::parser::range::take;
 use combine::parser::repeat::count;
 use combine::Parser;
 
+use crate::errors::{Error, Result as OpusResult};
 use crate::{FrameNum, SampleRate, Toc};
 
 pub fn get_nb_samples(data: &[u8], fs: SampleRate) -> Result<usize> {
@@ -16,15 +17,19 @@ pub fn get_nb_samples(data: &[u8], fs: SampleRate) -> Result<usize> {
     Ok(num)
 }
 
-pub fn parse_opus_pkt(data: &[u8], self_delimited: bool) -> Result<(Toc, Vec<&[u8]>)> {
-    let (toc, data) = take(1).map(|toc: &[u8]| Toc(toc[0])).parse(data)?;
+pub fn parse_opus_pkt(data: &[u8], self_delimited: bool) -> OpusResult<(Toc, Vec<&[u8]>)> {
+    let (toc, data) = take(1)
+        .map(|toc: &[u8]| Toc(toc[0]))
+        .parse(data)
+        .map_err(|_| Error::InvalidPacket("Empty packet".to_string()))?;
 
     let frames = match toc.num_of_frame() {
         FrameNum::One => parse_one_frame(data),
         FrameNum::Two => parse_two_frame(data),
         FrameNum::TwoDiff => parse_two_diff_frame(data),
         FrameNum::Arbitrary => parse_arbitrary_frame(data),
-    }?;
+    }
+    .map_err(|e| Error::InvalidPacket(e.to_string()))?;
     Ok((toc, frames))
 }
 

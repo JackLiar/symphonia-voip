@@ -9,4 +9,14 @@ combine = "4"
 thiserror = "1"
 
 [features]
+custom-modes = []
+fix-point = []
+float = []
+hardending = []
 osce = []
+
+[[example]]
+name = "demo"
+
+[dev-dependencies]
+clap = "4"

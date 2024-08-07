@@ -63,6 +63,27 @@ pub enum FrameSize {
     FS40,
     /// 60 ms
     FS60,
+    /// 80 ms
+    FS80,
+    /// 100 ms
+    FS100,
+    /// 120 ms
+    FS120,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd)]
+pub enum Complexity {
+    C0,
+    C1,
+    C2,
+    C3,
+    C4,
+    C5,
+    C6,
+    C7,
+    C8,
+    C9,
+    C10,
 }
 
 /// The available channel setings.
